@@ -1,17 +1,63 @@
 [package]
 name = "pysandbox-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-pyo3 = { version = "0.23.5", features = [ "auto-initialize"] }
 anyhow = "1.0.97"
+async-trait = "0.1.88"
 thiserror = "2.0.12"
-textwrap = "0.16.0"
+tokio = { version = "1.42", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+which = "7.0"
+tempfile = "3.14"
+base64 = "0.22"
+uuid = { version = "1.11", features = ["v4"] }
+ed25519-dalek = { version = "2.1.1", features = ["rand_core"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# Optional dependencies for microsandbox
+microsandbox = { version = "0.1.2", optional = true }
+
+# Unix-specific dependencies
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+nix = { version = "0.29", features = ["process", "signal"] }
+
+# Windows-specific dependencies
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+microsandbox-engine = ["microsandbox"]
 
 [lib]
-name = "sandboxed_python"
+name = "pysandbox"
 crate-type = ["rlib"]
 
-[build-dependencies]
-pyo3-build-config = "0.23.5"
+[[example]]
+name = "simple_demo"
+required-features = []
+
+[[example]]
+name = "working_demo"
+required-features = []
+
+# Note: tauri_backend.rs is a template for Tauri integration,
+# not a standalone example. Copy it to your Tauri project.
+
+[[example]]
+name = "interactive_setup"
+required-features = ["microsandbox-engine"]

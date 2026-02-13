@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!--
+      Allow a bundled executable to inherit the parent's App Sandbox.
+
+      Intended for the bundled Python interpreter invoked by the sandboxed
+      `rzn-python-worker` process in Secure mode.
+    -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+  </dict>
+</plist>
+

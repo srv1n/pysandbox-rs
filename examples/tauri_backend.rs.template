@@ -1,0 +1,106 @@
+/// Example Tauri backend integration
+/// This shows how to integrate pysandbox-rs into a Tauri application
+/// For a complete example, see TAURI_INTEGRATION.md
+
+use pysandbox::{create_default_sandbox, ExecutionOptions};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExecutionRequest {
+    pub code: String,
+    pub inputs: serde_json::Value,
+    pub timeout_seconds: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExecutionResult {
+    pub success: bool,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub execution_time_ms: u64,
+}
+
+// This would be managed by Tauri's state system
+pub struct AppState {
+    sandbox: Arc<Mutex<Option<pysandbox::PythonSandbox>>>,
+}
+
+// Tauri command example
+#[tauri::command]
+async fn execute_python(
+    state: tauri::State<'_, AppState>,
+    request: ExecutionRequest,
+) -> Result<ExecutionResult, String> {
+    let start = std::time::Instant::now();
+    
+    // Get or create sandbox
+    let mut sandbox_lock = state.sandbox.lock().await;
+    if sandbox_lock.is_none() {
+        let sandbox = create_default_sandbox().await
+            .map_err(|e| format!("Failed to create sandbox: {}", e))?;
+        *sandbox_lock = Some(sandbox);
+    }
+    
+    let sandbox = sandbox_lock.as_ref().unwrap();
+    
+    // Prepare options
+    let mut options = ExecutionOptions::default();
+    if let Some(timeout) = request.timeout_seconds {
+        options.timeout = std::time::Duration::from_secs(timeout);
+    }
+    
+    // Execute code
+    match sandbox.execute(&request.code, request.inputs, options).await {
+        Ok(result) => Ok(ExecutionResult {
+            success: true,
+            result: Some(result),
+            error: None,
+            execution_time_ms: start.elapsed().as_millis() as u64,
+        }),
+        Err(e) => Ok(ExecutionResult {
+            success: false,
+            result: None,
+            error: Some(e.to_string()),
+            execution_time_ms: start.elapsed().as_millis() as u64,
+        }),
+    }
+}
+
+// Example of module installation command
+#[tauri::command]
+async fn install_python_module(module: String) -> Result<String, String> {
+    // This would integrate with the module manager
+    // See DYNAMIC_MODULES.md for full implementation
+    Ok(format!("Module {} would be installed here", module))
+}
+
+// Example main function for Tauri app
+fn main() {
+    let app_state = AppState {
+        sandbox: Arc::new(Mutex::new(None)),
+    };
+    
+    tauri::Builder::default()
+        .manage(app_state)
+        .invoke_handler(tauri::generate_handler![
+            execute_python,
+            install_python_module,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+// Example usage from frontend:
+// ```typescript
+// import { invoke } from '@tauri-apps/api/tauri';
+// 
+// const result = await invoke('execute_python', {
+//   request: {
+//     code: 'result = sum([1, 2, 3, 4, 5])',
+//     inputs: {},
+//     timeout_seconds: 30
+//   }
+// });
+// ```

@@ -1,2 +1,7 @@
 /target
 .DS_Store
+dist/
+.secrets/
+*.zip
+python-bundle/
+python-bundle.tar.gz

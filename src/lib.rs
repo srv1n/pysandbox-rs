@@ -1,83 +1,121 @@
-mod analyzer;
-mod errors;
-mod executor;
+pub mod config;
+pub mod engine;
+pub mod errors;
+pub mod native;
+pub mod policy;
+pub mod sandbox_builder;
+pub mod sandboxed;
 
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use std::collections::HashMap;
+#[cfg(feature = "microsandbox-engine")]
+pub mod microsandbox_engine;
 
-pub use errors::SandboxError;
+#[cfg(feature = "microsandbox-engine")]
+pub mod microsandbox_setup;
 
-/// Runs Python code in a sandboxed environment.
-///
-/// # Arguments
-/// - `code`: The Python code to execute.
-/// - `inputs`: A map of input variables (e.g., {"data": PyObject}).
-/// - `whitelist`: List of allowed module names (e.g., ["numpy", "matplotlib.pyplot"]).
-/// - `blacklist`: List of disallowed function/method names (e.g., ["open", "savefig"]).
-///
-/// # Returns
-/// - `Ok(PyObject)` containing the execution result.
-/// - `Err(SandboxError)` if analysis or execution fails.
-///
-/// # Example
-/// ```rust
-/// use sandboxed_python::{run_sandboxed_code, SandboxError};
-/// use pyo3::prelude::*;
-/// use std::collections::HashMap;
-///
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let code = "result = data + 1";
-///     let mut inputs = HashMap::new();
-///     Python::with_gil(|py| {
-///         inputs.insert("data".to_string(), 42.to_object(py));
-///     });
-///     let whitelist = vec!["numpy"];
-///     let blacklist = vec!["open"];
-///
-///     let result = run_sandboxed_code(code, inputs, &whitelist, &blacklist)?;
-///     Python::with_gil(|py| {
-///         println!("Result: {}", result.extract::<i32>(py)?);
-///     });
-///     Ok(())
-/// }
-/// ```
-pub fn run_sandboxed_code(
-    code: &str,
-    inputs: HashMap<String, PyObject>,
-    whitelist: &[&str],
-    blacklist: &[&str],
-) -> Result<PyObject, SandboxError> {
-    Python::with_gil(|py| {
-        // Step 1: Static analysis
-        analyzer::analyze_code(py, code, whitelist, blacklist)
-            .map_err(|e| SandboxError::DisallowedOperation(e.to_string()))?;
+#[cfg(feature = "microsandbox-engine")]
+pub mod microsandbox_auth;
 
-        // Step 2: Execute the code
-        executor::execute_code(py, code, &inputs, whitelist)
-            .map_err(|e| SandboxError::RuntimeError(e.to_string()))
-    })
+pub use config::{ExecutionMode, ImportPolicy, ResourceLimits, SecurityProfile};
+pub use engine::{EngineCapabilities, ExecutionOptions, PythonEngine};
+pub use errors::{Result, SandboxError};
+
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+/// Main sandbox manager that handles multiple execution engines
+pub struct PythonSandbox {
+    engines: Vec<Arc<RwLock<Box<dyn PythonEngine>>>>,
+    primary_engine: usize,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pyo3::types::IntoPyDict;
+impl PythonSandbox {
+    /// Create a new sandbox with the specified engines
+    pub fn new(engines: Vec<Box<dyn PythonEngine>>) -> Self {
+        Self {
+            engines: engines
+                .into_iter()
+                .map(|e| Arc::new(RwLock::new(e)))
+                .collect(),
+            primary_engine: 0,
+        }
+    }
 
-    #[test]
-    fn test_basic_execution() {
-        let code = "result = x + y";
-        let mut inputs = HashMap::new();
-        Python::with_gil(|py| {
-            inputs.insert("x".to_string(), 3.to_object(py));
-            inputs.insert("y".to_string(), 4.to_object(py));
-        });
-        let whitelist = vec![];
-        let blacklist = vec![];
-        
-        let result = run_sandboxed_code(code, inputs, &whitelist, &blacklist).unwrap();
-        Python::with_gil(|py| {
-            assert_eq!(result.extract::<i32>(py).unwrap(), 7);
-        });
+    /// Execute Python code using the primary engine with fallback support
+    pub async fn execute(
+        &self,
+        code: &str,
+        inputs: serde_json::Value,
+        options: ExecutionOptions,
+    ) -> Result<serde_json::Value> {
+        let primary = &self.engines[self.primary_engine];
+
+        match primary
+            .write()
+            .await
+            .execute(code, inputs.clone(), &options)
+            .await
+        {
+            Ok(result) => Ok(result),
+            Err(e) if self.engines.len() > 1 => {
+                tracing::warn!("Primary engine failed: {}, trying fallback", e);
+                // Try fallback engines
+                for (idx, engine) in self.engines.iter().enumerate() {
+                    if idx != self.primary_engine {
+                        match engine
+                            .write()
+                            .await
+                            .execute(code, inputs.clone(), &options)
+                            .await
+                        {
+                            Ok(result) => return Ok(result),
+                            Err(e) => tracing::warn!("Fallback engine {} failed: {}", idx, e),
+                        }
+                    }
+                }
+                Err(e)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Get capabilities of all engines
+    pub async fn capabilities(&self) -> Vec<EngineCapabilities> {
+        let mut caps = Vec::new();
+        for engine in &self.engines {
+            caps.push(engine.read().await.capabilities());
+        }
+        caps
     }
 }
+
+// Re-export sandbox creation functions
+pub use sandbox_builder::{
+    create_bundled_sandbox, create_default_sandbox, create_sandbox_interactive,
+    create_sandbox_with_options, SandboxOptions,
+};
+
+// Re-export native engine for direct use
+pub use native::NativePythonEngine;
+
+// Re-export sandboxed engine and types
+pub use sandboxed::{
+    IsolatedWorkspace, SandboxConfig, SandboxedExecutionBuilder, SandboxedExecutionResult,
+    SandboxedPythonEngine,
+};
+
+// Re-export policy system
+pub use policy::{
+    // Enterprise
+    EnterprisePolicy,
+    ExecutionEnvironment,
+    FilesystemPolicy,
+    ImportPolicyType,
+    // Primitives
+    NetworkPolicy,
+    PolicyManager,
+    ProcessPolicy,
+    ResourceLimitsPolicy,
+    // Policy
+    SandboxPolicy,
+    SandboxPolicyBuilder,
+};
