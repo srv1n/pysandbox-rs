@@ -1,0 +1,95 @@
+name: publish-python-tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Catalog channel"
+        required: true
+        default: "stable"
+        type: choice
+        options:
+          - stable
+          - beta
+          - nightly
+      publish_catalog:
+        description: "Also publish catalog (writes plugins/current.json)"
+        required: true
+        default: true
+        type: boolean
+      backend_base_url:
+        description: "Backend base URL (e.g. https://api.rzn.ai). Overrides secret if set."
+        required: false
+        default: ""
+        type: string
+  push:
+    tags:
+      - "python-tools-v*"
+
+jobs:
+  publish:
+    runs-on: macos-14
+    permissions:
+      contents: read
+    env:
+      R2_PLUGINS_BUCKET: ${{ secrets.R2_PLUGINS_BUCKET }}
+      R2_PLUGINS_ENDPOINT: ${{ secrets.R2_PLUGINS_ENDPOINT }}
+      R2_PLUGINS_ACCESS_KEY_ID: ${{ secrets.R2_PLUGINS_ACCESS_KEY_ID }}
+      R2_PLUGINS_SECRET_ACCESS_KEY: ${{ secrets.R2_PLUGINS_SECRET_ACCESS_KEY }}
+      R2_PLUGINS_REGION: ${{ secrets.R2_PLUGINS_REGION || 'auto' }}
+      R2_PLUGINS_PREFIX: ${{ secrets.R2_PLUGINS_PREFIX || 'plugins' }}
+      RZN_PLATFORM_ADMIN_TOKEN: ${{ secrets.RZN_PLATFORM_ADMIN_TOKEN }}
+      RZN_BACKEND_BASE_URL: ${{ inputs.backend_base_url != '' && inputs.backend_base_url || secrets.RZN_BACKEND_BASE_URL }}
+      RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64: ${{ secrets.RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install awscli
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install awscli
+          aws --version
+
+      - name: Write bundle signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64}" ]]; then
+            echo "missing secret RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64" >&2
+            exit 2
+          fi
+          mkdir -p .secrets/plugin-signing
+          # Accept 32-byte seed or 64-byte secret; devkit uses the first 32 bytes of decoded key.
+          printf "%s\n" "${RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64}" > .secrets/plugin-signing/ed25519.private
+
+      - name: Build + sign plugin zip
+        run: |
+          bash scripts/build_python_tools_bundle_macos_universal.sh
+
+      - name: Upload + register + publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="${{ inputs.channel || 'stable' }}"
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            channel="stable"
+          fi
+
+          extra=()
+          if [[ "${{ inputs.publish_catalog }}" != "true" ]]; then
+            extra+=(--skip-publish)
+          fi
+          python3 scripts/publish_python_tools_release.py --channel "${channel}" "${extra[@]}"
+

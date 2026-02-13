@@ -160,3 +160,31 @@ Security profiles:
 
 You can override `execution_mode` explicitly (`native`, `workspace_isolated`, `platform_sandboxed`),
 but enterprise-managed `rznapp` installs may strip/override this at the host boundary.
+
+## CI publish (backend Option B)
+
+Once the backend registry/publisher is running, CI (or a local script) can publish a release:
+
+Workflow: `.github/workflows/publish_python_tools.yml`
+
+Required GitHub Secrets:
+- `R2_PLUGINS_BUCKET`
+- `R2_PLUGINS_ENDPOINT`
+- `R2_PLUGINS_ACCESS_KEY_ID`
+- `R2_PLUGINS_SECRET_ACCESS_KEY`
+- `RZN_BACKEND_BASE_URL`
+- `RZN_PLATFORM_ADMIN_TOKEN` (must be `platform_admin`)
+- `RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64` (base64 seed; 32 bytes; 64-byte secrets accepted)
+
+Local (optional) publish helper:
+
+```bash
+export R2_PLUGINS_BUCKET=...
+export R2_PLUGINS_ENDPOINT=...
+export R2_PLUGINS_ACCESS_KEY_ID=...
+export R2_PLUGINS_SECRET_ACCESS_KEY=...
+export RZN_BACKEND_BASE_URL="http://0.0.0.0:8082"
+export RZN_PLATFORM_ADMIN_TOKEN="..."
+
+python3 scripts/publish_python_tools_release.py --channel stable
+```

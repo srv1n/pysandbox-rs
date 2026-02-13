@@ -69,14 +69,14 @@ fn cmd_sign(args: &[String]) -> anyhow::Result<()> {
         arg_value(args, "--output").ok_or_else(|| anyhow::anyhow!("missing --output"))?;
 
     let key_bytes = read_b64_file(Path::new(&key_path))?;
-    if key_bytes.len() != 32 {
+    if key_bytes.len() < 32 {
         return Err(anyhow::anyhow!(
-            "invalid Ed25519 private key length: {} (expected 32)",
+            "invalid Ed25519 private key length: {} (expected at least 32)",
             key_bytes.len()
         ));
     }
     let mut seed = [0u8; 32];
-    seed.copy_from_slice(&key_bytes);
+    seed.copy_from_slice(&key_bytes[..32]);
     let signing = SigningKey::from_bytes(&seed);
 
     let message = std::fs::read(&input_path)?;
