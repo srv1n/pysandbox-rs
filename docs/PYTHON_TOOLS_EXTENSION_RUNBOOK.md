@@ -12,6 +12,7 @@ The fastest demo loop is **Install from file…** in the desktop host (`rznapp`)
 - Rust toolchain (`cargo`)
 - Python 3 (`python3`) to run packager scripts
 - macOS (for `macos_universal` bundle)
+  - The bundled runtime directory `python-bundle/` is **gitignored** (generated locally).
 
 Optional:
 - Codesigning identity (to enforce App Sandbox at the OS boundary):
@@ -44,6 +45,12 @@ bash scripts/build_python_tools_bundle_macos_universal.sh
 ```
 
 Manual path:
+
+Build (or refresh) the bundled Python runtime if you don't already have `python-bundle/`:
+
+```bash
+bash scripts/build-python-bundle.sh --output-dir python-bundle
+```
 
 ```bash
 export RZN_PYTHON_WORKER_BIN_MACOS="$(pwd)/target/universal-apple-darwin/release/rzn-python-worker"
