@@ -14,6 +14,8 @@ pub struct ExecutionOptions {
     pub timeout: Duration,
     /// Import policy
     pub import_policy: crate::config::ImportPolicy,
+    /// Optional outbound host allowlist (exact host or `*.domain` suffix entries)
+    pub network_allowlist: Option<Vec<String>>,
     /// Environment variables to set
     pub env_vars: std::collections::HashMap<String, String>,
 }
@@ -25,6 +27,7 @@ impl Default for ExecutionOptions {
             cpu_seconds: 30,
             timeout: Duration::from_secs(35),
             import_policy: crate::config::ImportPolicy::default(),
+            network_allowlist: None,
             env_vars: std::collections::HashMap::new(),
         }
     }

@@ -7,9 +7,9 @@ cd "$ROOT"
 KEY_DIR="$ROOT/.secrets/plugin-signing"
 PRIV="$KEY_DIR/ed25519.private"
 
-if [[ ! -d "$ROOT/python-bundle" ]]; then
-  echo "python bundle missing; building to $ROOT/python-bundle (this may take a while)"
-  bash scripts/build-python-bundle.sh --output-dir "$ROOT/python-bundle"
+if [[ ! -d "$ROOT/python-bundle-minimal" ]]; then
+  echo "python bundle missing; building minimal bundle to $ROOT/python-bundle-minimal (this may take a while)"
+  bash scripts/build-python-bundle.sh --minimal --output-dir "$ROOT/python-bundle-minimal"
 fi
 
 if [[ ! -f "$PRIV" ]]; then

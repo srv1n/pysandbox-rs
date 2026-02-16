@@ -13,7 +13,8 @@
 #   --packages PACKAGES   Comma-separated list of packages to install
 #                         (default: pymupdf,numpy,pandas,matplotlib)
 #   --minimal             Only install PyMuPDF (smallest bundle)
-#   --full                Install all data science packages including scipy
+#   --full                Install common data science packages (includes scipy + openpyxl)
+#   --datascience         Install "demo" data science stack (adds sklearn + pillow)
 #   --help                Show this help message
 #
 
@@ -25,6 +26,7 @@ PYTHON_BUILD_DATE="20241016"
 DEFAULT_PACKAGES="pymupdf==1.24.14,numpy==1.26.4,pandas==2.2.3,matplotlib==3.9.2"
 MINIMAL_PACKAGES="pymupdf==1.24.14"
 FULL_PACKAGES="pymupdf==1.24.14,numpy==1.26.4,pandas==2.2.3,matplotlib==3.9.2,scipy==1.14.1,openpyxl==3.1.5"
+DATASCIENCE_PACKAGES="pymupdf==1.24.14,numpy==1.26.4,pandas==2.2.3,matplotlib==3.9.2,scipy==1.14.1,scikit-learn==1.5.2,openpyxl==3.1.5,pillow==10.4.0"
 
 # Script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,6 +53,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --full)
             PACKAGES="$FULL_PACKAGES"
+            shift
+            ;;
+        --datascience)
+            PACKAGES="$DATASCIENCE_PACKAGES"
             shift
             ;;
         --help)
@@ -210,7 +216,6 @@ cd python
 # Remove test files and documentation
 rm -rf share/man 2>/dev/null || true
 rm -rf lib/python3.11/test 2>/dev/null || true
-rm -rf lib/python3.11/unittest 2>/dev/null || true
 rm -rf lib/python3.11/idlelib 2>/dev/null || true
 rm -rf lib/python3.11/tkinter 2>/dev/null || true
 rm -rf lib/python3.11/turtledemo 2>/dev/null || true
@@ -226,6 +231,9 @@ rm -rf lib/python3.11/site-packages/pip 2>/dev/null || true
 rm -rf lib/python3.11/site-packages/setuptools 2>/dev/null || true
 rm -rf lib/python3.11/site-packages/pkg_resources 2>/dev/null || true
 rm -rf lib/python3.11/site-packages/*.dist-info/RECORD 2>/dev/null || true
+
+# Remove pip entrypoints (they will be broken once site-packages/pip is removed)
+rm -f bin/pip bin/pip3 bin/pip3.11 2>/dev/null || true
 
 cd ..
 
@@ -259,7 +267,7 @@ echo "   Bundle:  $OUTPUT_DIR"
 echo "   Archive: $ARCHIVE_PATH"
 echo ""
 echo "🧪 Test with:"
-echo "   $OUTPUT_DIR/bin/python3 -c \"import fitz, numpy, pandas, matplotlib; print('OK')\""
+echo "   $OUTPUT_DIR/bin/python3 -c \"import fitz; print('OK')\""
 echo ""
 echo "📝 Next steps:"
 echo "   1. Add to tauri.conf.json resources: [\"python/**/*\"]"

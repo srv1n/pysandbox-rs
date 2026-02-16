@@ -67,6 +67,11 @@ def main() -> int:
         default="scripts/plugins/config/python-tools.json",
         help="Plugin config JSON path",
     )
+    ap.add_argument(
+        "--build-script",
+        default="scripts/build_python_tools_bundle_macos_universal.sh",
+        help="Build script to run when --skip-build is not set",
+    )
     ap.add_argument("--platform", default="macos_universal", help="Platform key")
     ap.add_argument("--channel", default="stable", choices=["stable", "beta", "nightly"])
     ap.add_argument(
@@ -103,7 +108,7 @@ def main() -> int:
 
     # 1) Build artifacts
     if not args.skip_build:
-        sh(["bash", str(root / "scripts/build_python_tools_bundle_macos_universal.sh")])
+        sh(["bash", str((root / args.build_script).resolve())])
 
     zip_name = f"{plugin_id}-{version}-{args.platform}.zip"
     zip_path = (
@@ -178,4 +183,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         raise
-

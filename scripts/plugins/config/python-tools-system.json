@@ -1,8 +1,8 @@
 {
-  "id": "python-tools",
+  "id": "python-tools-system",
   "version": "0.2.1",
-  "name": "Python Tools",
-  "description": "Python sandbox worker (sidecar) with bundled/system runtime selection (bundled minimal runtime)",
+  "name": "Python Tools (System Python)",
+  "description": "Python sandbox worker (sidecar) using system Python only (no bundled runtime).",
   "mcp_protocol_version": "2025-06-18",
   "platforms": ["macos_universal"],
   "workers": [
@@ -10,7 +10,7 @@
       "id": "python",
       "kind": "mcp_stdio",
       "auto_start": false,
-      "tools_namespace": "plugin:python-tools",
+      "tools_namespace": "plugin:python-tools-system",
       "entrypoints": {
         "macos_universal": "bin/macos/universal/rzn-python-worker"
       },
@@ -26,11 +26,6 @@
       "mode": "755"
     }
   ],
-  "shared_payloads": [
-    {
-      "source": "python-bundle-minimal",
-      "dest": "resources/python"
-    }
-  ],
-  "resources": ["resources/python/bin/python3"]
+  "resources": []
 }
+

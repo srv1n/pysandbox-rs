@@ -94,16 +94,22 @@ This makes the build/publish loop independent of the desktop repo.
 
 ## 4) Build Outputs (what CI produces)
 
-Each build produces artifact zips per platform:
+Each build produces artifact zips per platform (multiple variants):
 
 ```
-dist/plugins/python-tools/<version>/<platform>/python-tools-<version>-<platform>.zip
+dist/plugins/<plugin_id>/<version>/<platform>/<plugin_id>-<version>-<platform>.zip
 ```
 
 Platforms:
 
 - `macos_universal` (launch target)
 - later: `windows_x86_64`, `linux_x86_64`
+
+Variants (initial macOS launch set):
+
+- `python-tools` (bundled minimal runtime)
+- `python-tools-system` (no bundled runtime; uses system python)
+- `python-tools-ds` (bundled data science runtime)
 
 Each artifact should also produce:
 

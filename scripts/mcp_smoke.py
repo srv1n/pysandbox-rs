@@ -29,7 +29,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--python-path",
-        default=str(Path("python-bundle/bin/python3.11")),
+        default=str(Path("python-bundle-minimal/bin/python3")),
         help="Explicit python executable path (used to avoid requiring an installed plugin dir)",
     )
     ap.add_argument("--policy-id", default="balanced", help="policy_id to pass to python_sandbox")
@@ -113,4 +113,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

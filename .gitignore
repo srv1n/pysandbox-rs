@@ -5,5 +5,7 @@ dist/
 *.zip
 python-bundle/
 python-bundle.tar.gz
+python-bundle-*/
+python-bundle-*.tar.gz
 __pycache__/
 *.pyc

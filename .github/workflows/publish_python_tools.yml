@@ -76,7 +76,7 @@ jobs:
 
       - name: Build + sign plugin zip
         run: |
-          bash scripts/build_python_tools_bundle_macos_universal.sh
+          bash scripts/build_python_tools_variants_macos_universal.sh
 
       - name: Upload + register + publish
         shell: bash
@@ -91,5 +91,4 @@ jobs:
           if [[ "${{ inputs.publish_catalog }}" != "true" ]]; then
             extra+=(--skip-publish)
           fi
-          python3 scripts/publish_python_tools_release.py --channel "${channel}" "${extra[@]}"
-
+          python3 scripts/publish_python_tools_variants.py --channel "${channel}" "${extra[@]}"

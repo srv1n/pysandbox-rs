@@ -1,9 +1,9 @@
 # Python Tools Extension (python-tools): Local Build + Install-from-file
 
-This repo builds the `python-tools` extension ZIP (signed plugin bundle) containing:
+This repo builds signed extension ZIPs (plugin bundles) containing:
 
 - `rzn-python-worker` (MCP stdio sidecar)
-- a bundled Python runtime under `resources/python/` (optional at runtime; the worker can also use system Python)
+- optionally a bundled Python runtime under `resources/python/` (the worker can also use system Python)
 
 The fastest demo loop is **Install from file…** in the desktop host (`rznapp`).
 
@@ -12,7 +12,7 @@ The fastest demo loop is **Install from file…** in the desktop host (`rznapp`)
 - Rust toolchain (`cargo`)
 - Python 3 (`python3`) to run packager scripts
 - macOS (for `macos_universal` bundle)
-  - The bundled runtime directory `python-bundle/` is **gitignored** (generated locally).
+  - Bundled runtime directories (`python-bundle-*`) are **gitignored** (generated locally).
 
 Optional:
 - Codesigning identity (to enforce App Sandbox at the OS boundary):
@@ -44,12 +44,18 @@ Fast path:
 bash scripts/build_python_tools_bundle_macos_universal.sh
 ```
 
-Manual path:
-
-Build (or refresh) the bundled Python runtime if you don't already have `python-bundle/`:
+Build all variations (system + minimal bundle + data science bundle):
 
 ```bash
-bash scripts/build-python-bundle.sh --output-dir python-bundle
+bash scripts/build_python_tools_variants_macos_universal.sh
+```
+
+Manual path:
+
+Build (or refresh) the bundled Python runtime if you don't already have `python-bundle-minimal/`:
+
+```bash
+bash scripts/build-python-bundle.sh --minimal --output-dir python-bundle-minimal
 ```
 
 ```bash
@@ -61,7 +67,9 @@ python3 scripts/plugins/build_bundle.py \
 ```
 
 Output:
-- `dist/plugins/python-tools/0.2.0/macos_universal/python-tools-0.2.0-macos_universal.zip`
+- `dist/plugins/python-tools/0.2.1/macos_universal/python-tools-0.2.1-macos_universal.zip`
+- `dist/plugins/python-tools-system/0.2.1/macos_universal/python-tools-system-0.2.1-macos_universal.zip`
+- `dist/plugins/python-tools-ds/0.2.1/macos_universal/python-tools-ds-0.2.1-macos_universal.zip`
 
 If `RZN_MACOS_CODESIGN_IDENTITY` is set, Mach-O payloads in the bundle are codesigned using:
 - `entitlements/RznPythonWorker.entitlements` (worker)
@@ -105,6 +113,53 @@ Expected:
 - `structuredContent.output.stdout` contains `hello`
 - `structuredContent.output.result` contains the JSON result
 
+### YOLO managed env flow (create → install → run)
+
+Use app-managed venvs for developer workflows instead of mutating the bundled runtime.
+
+1) Create env alias:
+
+```json
+{
+  "alias": "demo"
+}
+```
+
+- Tool: `python_env.create`
+
+2) Install dependencies:
+
+```json
+{
+  "alias": "demo",
+  "packages": ["requests==2.32.3"]
+}
+```
+
+- Tool: `python_env.install`
+
+3) Execute with that env:
+
+```json
+{
+  "policy_id": "yolo",
+  "python_env": "demo",
+  "code": "import requests\\nprint(requests.__version__)\\nresult={'ok': True}"
+}
+```
+
+Expected:
+- `structuredContent.python.kind` is `managed_env`
+- `structuredContent.output.stdout` contains the dependency version
+
+You can inspect existing envs with:
+- Tool: `python_env.list`
+
+Managed env storage root:
+- `RZN_PYTHON_ENVS_DIR` (preferred explicit path)
+- else `<RZN_APP_BASE_DIR>/python_envs`
+- else `~/.rzn/python_envs`
+
 ### Artifacts (workspace output export)
 
 In secure policies (`policy_id: enterprise|data_science|document_processing`), the worker uses the
@@ -140,9 +195,40 @@ The worker selects the interpreter in this order:
    - `system`: use `python3` / `python` from PATH
    - `auto`: prefer bundled, else system
 
+macOS YOLO default:
+- if policy is `yolo` and runtime was not explicitly set by tool args or env (`RZN_PYTHON_RUNTIME`), the worker defaults to `system`.
+- this keeps dev installs compatible with pip-managed local environments while enterprise policies remain sandboxed.
+
+Managed env override:
+- `python_env` / `pythonEnv` / `env_alias` selects an app-managed virtualenv interpreter.
+- for safety, managed env selection is currently allowed only with `policy_id: yolo`.
+
 Bundled lookup paths:
 - macOS/Linux: `resources/python/bin/python3` (fallback `.../python`)
 - Windows: `resources/python/python.exe`
+
+## Network allowlist (simple)
+
+`python_sandbox` accepts optional outbound host controls:
+- `network_allowlist` (or `networkAllowlist`): array of host patterns, or comma-separated string
+- `RZN_PYTHON_NETWORK_ALLOWLIST`: env fallback (comma-separated)
+
+Supported pattern forms:
+- exact host: `api.openai.com`
+- wildcard suffix: `*.corp.example`
+- allow all: `*`
+
+Example:
+
+```json
+{
+  "policy_id": "yolo",
+  "network_allowlist": ["api.openai.com", "*.github.com"],
+  "code": "import urllib.request; print(urllib.request.urlopen('https://api.openai.com').status)"
+}
+```
+
+In the current implementation, disallowed hosts raise `PermissionError` from a runtime socket guard.
 
 ## Sandbox selection (policy → mode)
 
@@ -187,4 +273,10 @@ export RZN_BACKEND_BASE_URL="http://0.0.0.0:8082"
 export RZN_PLATFORM_ADMIN_TOKEN="..."
 
 python3 scripts/publish_python_tools_release.py --channel stable
+```
+
+Publish all variants (recommended):
+
+```bash
+python3 scripts/publish_python_tools_variants.py --channel stable
 ```

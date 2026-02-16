@@ -1,8 +1,8 @@
 {
-  "id": "python-tools",
+  "id": "python-tools-ds",
   "version": "0.2.1",
-  "name": "Python Tools",
-  "description": "Python sandbox worker (sidecar) with bundled/system runtime selection (bundled minimal runtime)",
+  "name": "Python Tools (Data Science)",
+  "description": "Python sandbox worker (sidecar) with a bundled data science runtime (numpy/pandas/matplotlib/scipy/sklearn).",
   "mcp_protocol_version": "2025-06-18",
   "platforms": ["macos_universal"],
   "workers": [
@@ -10,7 +10,7 @@
       "id": "python",
       "kind": "mcp_stdio",
       "auto_start": false,
-      "tools_namespace": "plugin:python-tools",
+      "tools_namespace": "plugin:python-tools-ds",
       "entrypoints": {
         "macos_universal": "bin/macos/universal/rzn-python-worker"
       },
@@ -28,9 +28,10 @@
   ],
   "shared_payloads": [
     {
-      "source": "python-bundle-minimal",
+      "source": "python-bundle-ds",
       "dest": "resources/python"
     }
   ],
   "resources": ["resources/python/bin/python3"]
 }
+

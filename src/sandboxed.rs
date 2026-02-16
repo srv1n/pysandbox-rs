@@ -301,6 +301,90 @@ builtins.__import__ = safe_import
         }
     }
 
+    /// Generate network control code based on optional host allowlist
+    fn generate_network_control(&self, allowlist: Option<&[String]>) -> String {
+        let Some(allowlist) = allowlist else {
+            return String::new();
+        };
+        if allowlist.is_empty() {
+            return String::new();
+        }
+
+        let allowlist_str = format!(
+            "[{}]",
+            allowlist
+                .iter()
+                .map(|s| format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'")))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
+        format!(
+            r#"
+_RZN_NETWORK_ALLOWLIST = {allowlist}
+
+if _RZN_NETWORK_ALLOWLIST:
+    try:
+        import socket
+    except Exception:
+        socket = None
+
+    if socket is not None:
+        def _rzn_norm_host(value):
+            if value is None:
+                return ""
+            return str(value).strip().lower().rstrip(".")
+
+        def _rzn_host_allowed(host):
+            h = _rzn_norm_host(host)
+            if not h:
+                return True
+            for pattern in _RZN_NETWORK_ALLOWLIST:
+                p = _rzn_norm_host(pattern)
+                if not p:
+                    continue
+                if p == "*":
+                    return True
+                if p.startswith("*."):
+                    base = p[2:]
+                    if h == base or h.endswith("." + base):
+                        return True
+                elif h == p:
+                    return True
+            return False
+
+        def _rzn_host_from_address(address):
+            if isinstance(address, tuple) and len(address) > 0:
+                return address[0]
+            return None
+
+        _rzn_orig_getaddrinfo = socket.getaddrinfo
+        def _rzn_guarded_getaddrinfo(host, *args, **kwargs):
+            if not _rzn_host_allowed(host):
+                raise PermissionError(f"Network host not allowed: {{host}}")
+            return _rzn_orig_getaddrinfo(host, *args, **kwargs)
+        socket.getaddrinfo = _rzn_guarded_getaddrinfo
+
+        _rzn_orig_create_connection = socket.create_connection
+        def _rzn_guarded_create_connection(address, *args, **kwargs):
+            host = _rzn_host_from_address(address)
+            if not _rzn_host_allowed(host):
+                raise PermissionError(f"Network host not allowed: {{host}}")
+            return _rzn_orig_create_connection(address, *args, **kwargs)
+        socket.create_connection = _rzn_guarded_create_connection
+
+        _rzn_orig_socket_connect = socket.socket.connect
+        def _rzn_guarded_socket_connect(sock, address):
+            host = _rzn_host_from_address(address)
+            if not _rzn_host_allowed(host):
+                raise PermissionError(f"Network host not allowed: {{host}}")
+            return _rzn_orig_socket_connect(sock, address)
+        socket.socket.connect = _rzn_guarded_socket_connect
+"#,
+            allowlist = allowlist_str
+        )
+    }
+
     /// Build the command to execute Python in a sandbox
     #[cfg(target_os = "macos")]
     fn build_sandboxed_command(&self, workspace: &IsolatedWorkspace) -> Command {
@@ -424,10 +508,14 @@ except SyntaxError as e:
 # Security setup
 {}
 
+# Network setup
+{}
+
 # Input setup
 import json
 import sys
 import os
+import base64
 from io import StringIO
 
 inputs = json.loads('''{}''')
@@ -485,6 +573,13 @@ _output = {{
 if _exec_result is not None:
     if isinstance(_exec_result, (dict, list, str, int, float, bool, type(None))):
         _output["result"] = _exec_result
+    elif isinstance(_exec_result, (bytes, bytearray, memoryview)):
+        _bytes = bytes(_exec_result)
+        _output["result"] = {{
+            "type": "bytes",
+            "encoding": "base64",
+            "data": base64.b64encode(_bytes).decode("utf-8")
+        }}
     else:
         _output["result"] = {{"type": str(type(_exec_result).__name__), "repr": str(_exec_result)}}
 
@@ -496,6 +591,7 @@ if _exec_error:
     sys.exit(1)
 "#,
             self.generate_import_control(&options.import_policy),
+            self.generate_network_control(options.network_allowlist.as_deref()),
             serde_json::to_string(&inputs)?.replace("'", "\\'"),
             code.replace('\n', "\n    ")
         );
@@ -524,6 +620,9 @@ if _exec_error:
             "MKL_NUM_THREADS",
             self.config.limits.max_threads.to_string(),
         );
+        for (key, value) in &options.env_vars {
+            cmd.env(key, value);
+        }
 
         fn resolve_export_base_dir() -> Option<PathBuf> {
             if let Ok(v) = std::env::var("RZN_PYTHON_EXPORT_DIR") {
