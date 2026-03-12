@@ -1,0 +1,9 @@
+{
+  "tool_id": "mcp:plugin.python-tools.python:python_sandbox",
+  "args": {
+    "policy_id": "yolo",
+    "python_env": "demo",
+    "inputs": {},
+    "code": "import sys\nresult = {\"python\": sys.version.split()[0]}"
+  }
+}

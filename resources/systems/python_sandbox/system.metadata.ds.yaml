@@ -1,0 +1,275 @@
+version: 1
+
+system:
+  id: "python_sandbox"
+  display_name: "Python Sandbox"
+  what_it_does: "Execute Python code in a policy-driven sandbox and manage optional app-scoped virtual environments."
+  use_cases:
+    - "Run structured Python transforms from tool-calling workflows"
+    - "Test data parsing and summarization logic in isolated execution"
+    - "Create reusable managed virtual environments for YOLO workflows"
+    - "Install runtime dependencies into managed environments"
+    - "Run lightweight analysis and script-style automation safely"
+
+capability_groups:
+  - id: "diagnostics"
+    name: "Worker diagnostics"
+    description: "Verify worker availability and basic request/response health."
+    tool_ids:
+      - "mcp:plugin.python-tools-ds.python:python_tools.ping"
+      - "mcp:plugin.python-tools-ds.python:rzn.worker.health"
+      - "mcp:plugin.python-tools-ds.python:example.echo"
+
+  - id: "managed_env_lifecycle"
+    name: "Managed environment lifecycle"
+    description: "List, create, and install dependencies into app-managed Python virtual environments."
+    tool_ids:
+      - "mcp:plugin.python-tools-ds.python:python_env.list"
+      - "mcp:plugin.python-tools-ds.python:python_env.create"
+      - "mcp:plugin.python-tools-ds.python:python_env.install"
+
+  - id: "sandbox_execution"
+    name: "Sandbox code execution"
+    description: "Execute Python code with policy, runtime, timeout, and network controls."
+    tool_ids:
+      - "mcp:plugin.python-tools-ds.python:python_sandbox"
+
+setup_steps:
+  - id: "install_plugin"
+    kind: "install"
+    label: "Install a Python Tools plugin variant"
+    description: "Install one of: minimal bundled runtime, system runtime only, or data-science bundled runtime."
+
+  - id: "runtime_choice"
+    kind: "runtime"
+    label: "Choose Python runtime strategy"
+    description: "Use `python_runtime` = `auto`, `bundled`, or `system` depending on your environment and policy needs."
+
+  - id: "managed_env_optional"
+    kind: "runtime"
+    label: "Create a managed virtual environment (optional)"
+    description: "For `policy_id=yolo`, create a named managed environment with `python_env.create` and install packages with `python_env.install`."
+    optional: true
+
+  - id: "health_check"
+    kind: "connectivity"
+    label: "Run worker health checks"
+    description: "Call `rzn.worker.health` or `python_tools.ping` before first sandbox execution to validate startup wiring."
+
+context_parameters:
+  - id: "policy_id"
+    label: "Security policy"
+    kind: "enum"
+    required: false
+    default: "balanced"
+    enum_values:
+      - "yolo"
+      - "balanced"
+      - "data_science"
+      - "document_processing"
+      - "enterprise"
+
+  - id: "python_runtime"
+    label: "Python runtime"
+    kind: "enum"
+    required: false
+    default: "auto"
+    enum_values:
+      - "auto"
+      - "bundled"
+      - "system"
+
+  - id: "python_env"
+    label: "Managed env alias"
+    kind: "string"
+    required: false
+
+  - id: "timeout_seconds"
+    label: "Execution timeout seconds"
+    kind: "string"
+    required: false
+    default: "30"
+
+  - id: "network_allowlist"
+    label: "Network allowlist"
+    kind: "string"
+    required: false
+    default: ""
+
+quick_starts:
+  - id: "health_probe"
+    title: "Check worker health"
+    description: "Validate the worker process and plugin wiring."
+    tool_id: "mcp:plugin.python-tools-ds.python:rzn.worker.health"
+    args: {}
+    group_id: "diagnostics"
+
+  - id: "list_envs"
+    title: "List managed envs"
+    description: "Show all managed Python environments currently available to this worker."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_env.list"
+    args: {}
+    group_id: "managed_env_lifecycle"
+
+  - id: "create_demo_env"
+    title: "Create demo env"
+    description: "Create a managed environment alias named `demo` for iterative package installs."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_env.create"
+    args:
+      alias: "demo"
+    group_id: "managed_env_lifecycle"
+
+  - id: "run_hello_world"
+    title: "Run hello world in sandbox"
+    description: "Execute simple Python code with the default balanced policy."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "balanced"
+      code: |
+        print("hello from python sandbox")
+        result = {"status": "ok", "value": 42}
+      inputs: {}
+    group_id: "sandbox_execution"
+
+  - id: "run_in_demo_env"
+    title: "Run using managed env"
+    description: "Execute code with `policy_id=yolo` and a managed env alias."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "yolo"
+      python_env: "demo"
+      code: |
+        import sys
+        result = {"python": sys.version.split()[0]}
+      inputs: {}
+    group_id: "sandbox_execution"
+
+result_handling:
+  tools:
+    "mcp:plugin.python-tools-ds.python:python_tools.ping":
+      human_view:
+        renderer: "summary"
+      llm_view:
+        include:
+          - "content[0].text"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:rzn.worker.health":
+      human_view:
+        renderer: "key_value"
+        fields:
+          - "structuredContent.ok"
+          - "structuredContent.worker"
+          - "structuredContent.version"
+      llm_view:
+        include:
+          - "structuredContent.ok"
+          - "structuredContent.worker"
+          - "structuredContent.version"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:example.echo":
+      human_view:
+        renderer: "summary"
+      llm_view:
+        include:
+          - "content[0].text"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:python_env.list":
+      human_view:
+        renderer: "table"
+        records_path: "structuredContent.envs[]"
+        columns:
+          - key: "alias"
+            label: "Alias"
+          - key: "healthy"
+            label: "Healthy"
+          - key: "python_path"
+            label: "Python"
+      llm_view:
+        include:
+          - "structuredContent.envs[].alias"
+          - "structuredContent.envs[].healthy"
+          - "structuredContent.envs[].python_path"
+          - "structuredContent.envs_dir"
+          - "isError"
+        max_items: 100
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:python_env.create":
+      human_view:
+        renderer: "key_value"
+        fields:
+          - "structuredContent.alias"
+          - "structuredContent.created"
+          - "structuredContent.python_path"
+      llm_view:
+        include:
+          - "structuredContent.alias"
+          - "structuredContent.created"
+          - "structuredContent.python_path"
+          - "structuredContent.base_python"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:python_env.install":
+      human_view:
+        renderer: "summary"
+      llm_view:
+        include:
+          - "structuredContent.alias"
+          - "structuredContent.ok"
+          - "structuredContent.stdout"
+          - "structuredContent.stderr"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"
+
+    "mcp:plugin.python-tools-ds.python:python_sandbox":
+      human_view:
+        renderer: "stack"
+        sections:
+          - title: "Summary"
+            path: "content[0].text"
+          - title: "Policy"
+            path: "structuredContent.policy_id"
+          - title: "Execution mode"
+            path: "structuredContent.execution_mode"
+          - title: "Output"
+            path: "structuredContent.output"
+      llm_view:
+        include:
+          - "structuredContent.policy_id"
+          - "structuredContent.execution_mode"
+          - "structuredContent.python"
+          - "structuredContent.runtime"
+          - "structuredContent.output.result"
+          - "structuredContent.output.stdout"
+          - "structuredContent.output.stderr"
+          - "structuredContent.error"
+          - "isError"
+      index_view:
+        mode: "none"
+      debug_view:
+        mode: "raw_json"

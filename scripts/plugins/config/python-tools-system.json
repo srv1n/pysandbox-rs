@@ -26,6 +26,15 @@
       "mode": "755"
     }
   ],
-  "resources": []
+  "shared_payloads": [
+    {
+      "source": "resources/systems/python_sandbox/system.metadata.system.yaml",
+      "dest": "resources/systems/python_sandbox/system.metadata.yaml"
+    },
+    {
+      "source": "examples/python_sandbox",
+      "dest": "examples/python_sandbox"
+    }
+  ],
+  "resources": ["resources/systems/python_sandbox/system.metadata.yaml"]
 }
-

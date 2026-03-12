@@ -30,8 +30,18 @@
     {
       "source": "python-bundle-ds",
       "dest": "resources/python"
+    },
+    {
+      "source": "resources/systems/python_sandbox/system.metadata.ds.yaml",
+      "dest": "resources/systems/python_sandbox/system.metadata.yaml"
+    },
+    {
+      "source": "examples/python_sandbox",
+      "dest": "examples/python_sandbox"
     }
   ],
-  "resources": ["resources/python/bin/python3"]
+  "resources": [
+    "resources/python/bin/python3",
+    "resources/systems/python_sandbox/system.metadata.yaml"
+  ]
 }
-
