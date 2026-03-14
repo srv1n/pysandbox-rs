@@ -247,9 +247,21 @@ Security profiles:
 You can override `execution_mode` explicitly (`native`, `workspace_isolated`, `platform_sandboxed`),
 but enterprise-managed `rznapp` installs may strip/override this at the host boundary.
 
-## CI publish (backend Option B)
+## Release publish (backend Option B)
 
-Once the backend registry/publisher is running, CI (or a local script) can publish a release:
+Once the backend registry/publisher is running, CI (or a local script) can publish a release.
+
+Important:
+
+- Building the ZIP is not enough.
+- "Notify backend" means calling the backend publish APIs, not messaging a human.
+- A release is complete only after the backend register + catalog publish flow succeeds.
+- For local operator flows, publish to local `http://localhost:8082` first and then production `https://rzn.ai`.
+- If any stage fails, stop and report exactly what failed.
+
+Canonical backend runbook:
+
+- `/Users/sarav/Downloads/side/rzn/backend/docs/runbook/plugin_team_release_guide.md`
 
 Workflow: `.github/workflows/publish_python_tools.yml`
 
@@ -262,21 +274,41 @@ Required GitHub Secrets:
 - `RZN_PLATFORM_ADMIN_TOKEN` (must be `platform_admin`)
 - `RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64` (base64 seed; 32 bytes; 64-byte secrets accepted)
 
-Local (optional) publish helper:
+Local then production publish helper (recommended for manual release work):
 
 ```bash
 export R2_PLUGINS_BUCKET=...
 export R2_PLUGINS_ENDPOINT=...
 export R2_PLUGINS_ACCESS_KEY_ID=...
 export R2_PLUGINS_SECRET_ACCESS_KEY=...
-export RZN_BACKEND_BASE_URL="http://0.0.0.0:8082"
-export RZN_PLATFORM_ADMIN_TOKEN="..."
+export RZN_PLATFORM_ADMIN_TOKEN_LOCAL="..."
+export RZN_PLATFORM_ADMIN_TOKEN_PROD="..."
 
-python3 scripts/publish_python_tools_release.py --channel stable
+bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
 ```
 
-Publish all variants (recommended):
+Default targets:
+
+- local: `http://localhost:8082`
+- prod: `https://rzn.ai`
+
+The helper builds once, publishes to local first, then reuses the same artifact for production. It
+stops on the first failure so you can report the exact failing stage.
+
+Manual single-target publish:
 
 ```bash
+export RZN_BACKEND_BASE_URL="http://localhost:8082"
+export RZN_PLATFORM_ADMIN_TOKEN="..."
+
 python3 scripts/publish_python_tools_variants.py --channel stable
+```
+
+For production, rerun with:
+
+```bash
+export RZN_BACKEND_BASE_URL="https://rzn.ai"
+export RZN_PLATFORM_ADMIN_TOKEN="..."
+
+python3 scripts/publish_python_tools_variants.py --channel stable --skip-build --skip-upload
 ```

@@ -60,7 +60,7 @@ def aws_env_from_r2() -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Build + upload + register + publish python-tools to backend Option B."
+        description="Build + upload + register + publish python-tools to the backend catalog."
     )
     ap.add_argument(
         "--config",
@@ -94,7 +94,9 @@ def main() -> int:
     backend_base = os.environ.get("RZN_BACKEND_BASE_URL", "").strip().rstrip("/")
     admin_token = os.environ.get("RZN_PLATFORM_ADMIN_TOKEN", "").strip()
     if not backend_base:
-        raise RuntimeError("missing RZN_BACKEND_BASE_URL (e.g. https://api.rzn.ai)")
+        raise RuntimeError(
+            "missing RZN_BACKEND_BASE_URL (e.g. http://localhost:8082 or https://rzn.ai)"
+        )
     if not admin_token:
         raise RuntimeError("missing RZN_PLATFORM_ADMIN_TOKEN")
 

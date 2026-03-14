@@ -38,3 +38,16 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
+## Plugin Release Requirement
+
+If the task includes building or publishing Python Tools plugin artifacts, release completion also
+requires backend notification using the backend publish contract documented at:
+
+- `/Users/sarav/Downloads/side/rzn/backend/docs/runbook/plugin_team_release_guide.md`
+
+For plugin release work:
+
+- Building a ZIP alone is not enough.
+- Notify the backend through the release registration and catalog publish API flow.
+- Publish to local `http://localhost:8082` first, then production `https://rzn.ai`, unless the user explicitly says otherwise.
+- If local or production publish fails at any stage, stop and report exactly what failed.

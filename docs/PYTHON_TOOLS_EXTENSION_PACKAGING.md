@@ -119,12 +119,25 @@ Each artifact should also produce:
 
 ## 5) Publish Flow (Option B, backend-owned)
 
-This repo CI should:
+This repo does not "notify the backend team" by sending a human message. It notifies the backend by
+calling the backend release and catalog publish APIs.
+
+The governing runbook is:
+
+- `/Users/sarav/Downloads/side/rzn/backend/docs/runbook/plugin_team_release_guide.md`
+
+The required sequence is:
 
 1. Build the bundle artifact zip(s)
-2. Upload to R2: `plugins/artifacts/python-tools/...`
-3. Register release in backend DB: `POST /admin/plugins/releases`
-4. (Optional) trigger publish: `POST /admin/plugins/publish`
+2. Upload to R2/object storage under the agreed `plugins/` prefix
+3. Register the release in backend DB: `POST /admin/plugins/releases`
+4. Publish the signed catalog: `POST /admin/plugins/catalog/publish`
+5. Treat the release as complete only after this flow succeeds against:
+   - local `http://localhost:8082`
+   - production `https://rzn.ai`
+
+If local publish fails, stop there and report the failure. If production publish fails after local
+succeeds, report the production failure explicitly.
 
 Backend publishes:
 

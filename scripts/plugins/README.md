@@ -8,6 +8,25 @@ Outputs land in `dist/plugins/<id>/<version>/<platform>/` with:
 - `plugin.sig`
 - `<id>-<version>-<platform>.zip`
 
+## Release Requirement
+
+Building the ZIP is only the packaging half of the job.
+
+If the build is intended to become visible through the backend-served plugin catalog, the release is
+not done until the backend has been notified through the publish contract described in:
+
+- `/Users/sarav/Downloads/side/rzn/backend/docs/runbook/plugin_team_release_guide.md`
+
+That means:
+
+- upload the artifact,
+- register the release with the backend,
+- publish the catalog,
+- run the flow against local `http://localhost:8082` first,
+- then run it against production `https://rzn.ai`.
+
+If either publish target fails, stop there and report what failed.
+
 ## Keypair (dev)
 
 Generate a dev signing keypair:
@@ -49,3 +68,25 @@ python3 scripts/plugins/build_bundle.py \
 In `rznapp`:
 - Settings → Extensions → Install from file… → pick the generated ZIP
 - Enable the extension, then run the `python_sandbox` tool in Tool Bench.
+
+## Backend Publish Helpers
+
+For local-first then production publish:
+
+```bash
+export R2_PLUGINS_BUCKET=...
+export R2_PLUGINS_ENDPOINT=...
+export R2_PLUGINS_ACCESS_KEY_ID=...
+export R2_PLUGINS_SECRET_ACCESS_KEY=...
+export RZN_PLATFORM_ADMIN_TOKEN_LOCAL=...
+export RZN_PLATFORM_ADMIN_TOKEN_PROD=...
+
+bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
+```
+
+The helper publishes to:
+
+- local: `http://localhost:8082`
+- prod: `https://rzn.ai`
+
+It stops on the first failure and prints which target failed.
