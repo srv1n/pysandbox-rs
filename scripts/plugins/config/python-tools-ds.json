@@ -41,7 +41,11 @@
     }
   ],
   "resources": [
-    "resources/python/bin/python3",
-    "resources/systems/python_sandbox/system.metadata.yaml"
+    {
+      "path": "resources/python/bin/python3"
+    },
+    {
+      "path": "resources/systems/python_sandbox/system.metadata.yaml"
+    }
   ]
 }

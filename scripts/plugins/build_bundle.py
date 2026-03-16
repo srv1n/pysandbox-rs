@@ -214,9 +214,39 @@ def build_manifest(config: dict, platform: str, sha_map: OrderedDict) -> Ordered
             worker_out["tools_namespace"] = worker["tools_namespace"]
         workers_out.append(worker_out)
     manifest["workers"] = workers_out
-    manifest["resources"] = config.get("resources", [])
+    manifest["resources"] = normalize_resources(config.get("resources", []), sha_map)
     manifest["sha256"] = sha_map
     return manifest
+
+
+def normalize_resources(resources: list, sha_map: OrderedDict) -> list[OrderedDict]:
+    normalized = []
+    for item in resources:
+        explicit_sha = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = str(item.get("path", "")).strip()
+            explicit_sha = item.get("sha256")
+            if explicit_sha is not None:
+                explicit_sha = str(explicit_sha).strip()
+        else:
+            raise ValueError(f"unsupported resource entry: {item!r}")
+
+        path = normalize_dest(Path(path))
+        if not path:
+            raise ValueError(f"resource entry missing path: {item!r}")
+
+        sha = explicit_sha or sha_map.get(path)
+        if explicit_sha and path in sha_map and sha_map[path] != explicit_sha:
+            raise ValueError(f"resource sha256 mismatch for {path}")
+
+        resource = OrderedDict()
+        resource["path"] = path
+        if sha:
+            resource["sha256"] = sha
+        normalized.append(resource)
+    return normalized
 
 
 def write_manifest(path: Path, manifest: OrderedDict) -> None:
@@ -366,4 +396,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
