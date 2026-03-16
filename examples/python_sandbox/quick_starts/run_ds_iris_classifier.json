@@ -1,0 +1,8 @@
+{
+  "tool_id": "mcp:plugin.python-tools-ds.python:python_sandbox",
+  "args": {
+    "policy_id": "data_science",
+    "inputs": {},
+    "code": "from sklearn.datasets import load_iris\nfrom sklearn.linear_model import LogisticRegression\n\niris = load_iris()\nX, y = iris.data, iris.target\n\nmodel = LogisticRegression(max_iter=200).fit(X, y)\nresult = {\n  \"samples\": int(X.shape[0]),\n  \"features\": int(X.shape[1]),\n  \"classes\": iris.target_names.tolist(),\n  \"training_accuracy\": round(float(model.score(X, y)), 3)\n}"
+  }
+}

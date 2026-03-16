@@ -1,0 +1,8 @@
+{
+  "tool_id": "mcp:plugin.python-tools-ds.python:python_sandbox",
+  "args": {
+    "policy_id": "data_science",
+    "inputs": {},
+    "code": "import io\nimport numpy as np\nimport matplotlib.pyplot as plt\n\ndays = np.arange(7)\norders = np.array([120, 128, 133, 129, 141, 150, 160])\n\nfig, ax = plt.subplots(figsize=(7, 3))\nax.plot(days, orders, marker=\"o\", linewidth=2)\nax.set_title(\"Synthetic daily orders\")\nax.set_xlabel(\"Day\")\nax.set_ylabel(\"Orders\")\nax.grid(alpha=0.3)\n\nbuf = io.BytesIO()\nfig.savefig(buf, format=\"png\", dpi=160, bbox_inches=\"tight\")\nprint(f\"rendered {len(orders)} points\")\nresult = buf.getvalue()"
+  }
+}
