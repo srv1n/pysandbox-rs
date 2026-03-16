@@ -131,6 +131,172 @@ quick_starts:
       inputs: {}
     group_id: "sandbox_execution"
 
+  - id: "run_basic_stats"
+    title: "Run basic stats"
+    description: "Execute a deterministic in-memory transform and return structured JSON."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "balanced"
+      inputs:
+        numbers: [12, 19, 7, 25, 14, 22]
+      code: |
+        numbers = inputs["numbers"]
+        mean = sum(numbers) / len(numbers)
+        result = {
+          "count": len(numbers),
+          "sum": sum(numbers),
+          "mean": round(mean, 2),
+          "min": min(numbers),
+          "max": max(numbers)
+        }
+    group_id: "sandbox_execution"
+
+  - id: "run_order_summary"
+    title: "Summarize orders"
+    description: "Group structured input into customer and regional revenue metrics."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "balanced"
+      inputs:
+        orders:
+          - order_id: "A100"
+            customer: "Acme"
+            region: "NA"
+            amount: 1200.0
+          - order_id: "A101"
+            customer: "Globex"
+            region: "EU"
+            amount: 850.0
+          - order_id: "A102"
+            customer: "Acme"
+            region: "NA"
+            amount: 640.0
+          - order_id: "A103"
+            customer: "Initech"
+            region: "APAC"
+            amount: 1430.0
+      code: |
+        orders = inputs["orders"]
+        revenue_by_region = {}
+        customer_totals = {}
+
+        for order in orders:
+          region = order["region"]
+          revenue_by_region[region] = round(
+            revenue_by_region.get(region, 0.0) + order["amount"], 2
+          )
+
+          customer = order["customer"]
+          customer_totals[customer] = round(
+            customer_totals.get(customer, 0.0) + order["amount"], 2
+          )
+
+        top_customer = max(customer_totals.items(), key=lambda item: item[1])
+        largest_order = max(orders, key=lambda order: order["amount"])
+
+        result = {
+          "order_count": len(orders),
+          "total_revenue": round(sum(order["amount"] for order in orders), 2),
+          "average_order_value": round(
+            sum(order["amount"] for order in orders) / len(orders), 2
+          ),
+          "top_customer": {"name": top_customer[0], "revenue": top_customer[1]},
+          "largest_order_id": largest_order["order_id"],
+          "revenue_by_region": revenue_by_region
+        }
+    group_id: "sandbox_execution"
+
+  - id: "run_ds_plot_synthetic_orders"
+    title: "Plot synthetic orders"
+    description: "Render a deterministic matplotlib chart and return it as PNG bytes."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "data_science"
+      inputs: {}
+      code: |
+        import io
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        days = np.arange(7)
+        orders = np.array([120, 128, 133, 129, 141, 150, 160])
+
+        fig, ax = plt.subplots(figsize=(7, 3))
+        ax.plot(days, orders, marker="o", linewidth=2)
+        ax.set_title("Synthetic daily orders")
+        ax.set_xlabel("Day")
+        ax.set_ylabel("Orders")
+        ax.grid(alpha=0.3)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+        print(f"rendered {len(orders)} points")
+        result = buf.getvalue()
+    group_id: "sandbox_execution"
+
+  - id: "run_ds_iris_classifier"
+    title: "Train iris classifier"
+    description: "Verify the bundled data-science runtime by fitting a small sklearn model."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "data_science"
+      inputs: {}
+      code: |
+        from sklearn.datasets import load_iris
+        from sklearn.linear_model import LogisticRegression
+
+        iris = load_iris()
+        X, y = iris.data, iris.target
+
+        model = LogisticRegression(max_iter=200).fit(X, y)
+        result = {
+          "samples": int(X.shape[0]),
+          "features": int(X.shape[1]),
+          "classes": iris.target_names.tolist(),
+          "training_accuracy": round(float(model.score(X, y)), 3)
+        }
+    group_id: "sandbox_execution"
+
+  - id: "run_ds_usgs_quakes_chart"
+    title: "Chart USGS earthquakes"
+    description: "Fetch public earthquake data from an allowlisted host and render a histogram."
+    tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
+    args:
+      policy_id: "data_science"
+      network_allowlist:
+        - "*.usgs.gov"
+      inputs: {}
+      code: |
+        import io
+        import json
+        import urllib.request
+
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
+        with urllib.request.urlopen(url, timeout=20) as response:
+          feed = json.loads(response.read().decode("utf-8"))
+
+        rows = []
+        for feature in feed.get("features", []):
+          props = feature.get("properties") or {}
+          if props.get("mag") is not None:
+            rows.append({"mag": props["mag"], "place": props.get("place", "unknown")})
+
+        df = pd.DataFrame(rows)
+        print(f"fetched {len(df)} earthquakes")
+
+        fig, ax = plt.subplots(figsize=(7, 3))
+        df["mag"].plot(kind="hist", bins=20, ax=ax, title="USGS earthquakes (last day)")
+        ax.set_xlabel("Magnitude")
+        ax.grid(alpha=0.3)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+        result = buf.getvalue()
+    group_id: "sandbox_execution"
+
   - id: "run_in_demo_env"
     title: "Run using managed env"
     description: "Execute code with `policy_id=yolo` and a managed env alias."
