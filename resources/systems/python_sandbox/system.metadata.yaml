@@ -131,6 +131,81 @@ quick_starts:
       inputs: {}
     group_id: "sandbox_execution"
 
+  - id: "run_basic_stats"
+    title: "Run basic stats"
+    description: "Execute a deterministic in-memory transform and return structured JSON."
+    tool_id: "mcp:plugin.python-tools.python:python_sandbox"
+    args:
+      policy_id: "balanced"
+      inputs:
+        numbers: [12, 19, 7, 25, 14, 22]
+      code: |
+        numbers = inputs["numbers"]
+        mean = sum(numbers) / len(numbers)
+        result = {
+          "count": len(numbers),
+          "sum": sum(numbers),
+          "mean": round(mean, 2),
+          "min": min(numbers),
+          "max": max(numbers)
+        }
+    group_id: "sandbox_execution"
+
+  - id: "run_order_summary"
+    title: "Summarize orders"
+    description: "Group structured input into customer and regional revenue metrics."
+    tool_id: "mcp:plugin.python-tools.python:python_sandbox"
+    args:
+      policy_id: "balanced"
+      inputs:
+        orders:
+          - order_id: "A100"
+            customer: "Acme"
+            region: "NA"
+            amount: 1200.0
+          - order_id: "A101"
+            customer: "Globex"
+            region: "EU"
+            amount: 850.0
+          - order_id: "A102"
+            customer: "Acme"
+            region: "NA"
+            amount: 640.0
+          - order_id: "A103"
+            customer: "Initech"
+            region: "APAC"
+            amount: 1430.0
+      code: |
+        orders = inputs["orders"]
+        revenue_by_region = {}
+        customer_totals = {}
+
+        for order in orders:
+          region = order["region"]
+          revenue_by_region[region] = round(
+            revenue_by_region.get(region, 0.0) + order["amount"], 2
+          )
+
+          customer = order["customer"]
+          customer_totals[customer] = round(
+            customer_totals.get(customer, 0.0) + order["amount"], 2
+          )
+
+        top_customer = max(customer_totals.items(), key=lambda item: item[1])
+        largest_order = max(orders, key=lambda order: order["amount"])
+
+        result = {
+          "order_count": len(orders),
+          "total_revenue": round(sum(order["amount"] for order in orders), 2),
+          "average_order_value": round(
+            sum(order["amount"] for order in orders) / len(orders), 2
+          ),
+          "top_customer": {"name": top_customer[0], "revenue": top_customer[1]},
+          "largest_order_id": largest_order["order_id"],
+          "revenue_by_region": revenue_by_region
+        }
+    group_id: "sandbox_execution"
+
   - id: "run_in_demo_env"
     title: "Run using managed env"
     description: "Execute code with `policy_id=yolo` and a managed env alias."
