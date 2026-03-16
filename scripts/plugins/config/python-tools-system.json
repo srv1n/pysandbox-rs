@@ -36,5 +36,9 @@
       "dest": "examples/python_sandbox"
     }
   ],
-  "resources": ["resources/systems/python_sandbox/system.metadata.yaml"]
+  "resources": [
+    {
+      "path": "resources/systems/python_sandbox/system.metadata.yaml"
+    }
+  ]
 }
