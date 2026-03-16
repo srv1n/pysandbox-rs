@@ -1,0 +1,10 @@
+{
+  "tool_id": "mcp:plugin.python-tools.python:python_sandbox",
+  "args": {
+    "policy_id": "balanced",
+    "inputs": {
+      "numbers": [12, 19, 7, 25, 14, 22]
+    },
+    "code": "numbers = inputs[\"numbers\"]\nmean = sum(numbers) / len(numbers)\nresult = {\n  \"count\": len(numbers),\n  \"sum\": sum(numbers),\n  \"mean\": round(mean, 2),\n  \"min\": min(numbers),\n  \"max\": max(numbers)\n}"
+  }
+}
