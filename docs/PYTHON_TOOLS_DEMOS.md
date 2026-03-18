@@ -6,7 +6,7 @@ why this sandbox is useful:
 
 - basic deterministic execution
 - structured JSON input and output
-- artifact generation via binary `result`
+- artifact generation via normalized `summary` + `artifacts[]` payloads
 - scientific Python and ML
 - outbound network under an explicit allowlist
 
@@ -26,7 +26,7 @@ basic compute
 | --- | --- | --- | --- | --- |
 | Basic statistics | basic | `python-tools` | `examples/python_sandbox/quick_starts/run_basic_stats.json` | deterministic JSON result |
 | Order summary | basic-to-mid | `python-tools` | `examples/python_sandbox/quick_starts/run_order_summary.json` | `inputs` to structured business metrics |
-| Synthetic chart | mid | `python-tools-ds` | `examples/python_sandbox/quick_starts/run_ds_plot_synthetic_orders.json` | PNG bytes returned from Python |
+| Synthetic chart | mid | `python-tools-ds` | `examples/python_sandbox/quick_starts/run_ds_plot_synthetic_orders.json` | normalized PNG artifact bundle |
 | Iris classifier | advanced | `python-tools-ds` | `examples/python_sandbox/quick_starts/run_ds_iris_classifier.json` | real ML libraries working in sandbox |
 | USGS public-data chart | advanced | `python-tools-ds` | `examples/python_sandbox/quick_starts/run_ds_usgs_quakes_chart.json` | live fetch + allowlist + plot |
 
@@ -159,6 +159,7 @@ This one should also be exact:
 ### Python snippet
 
 ```python
+import base64
 import io
 import numpy as np
 import matplotlib.pyplot as plt
@@ -175,15 +176,27 @@ ax.grid(alpha=0.3)
 
 buf = io.BytesIO()
 fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+png_bytes = buf.getvalue()
 print(f"rendered {len(orders)} points")
-result = buf.getvalue()
+result = {
+    "summary": {"points": int(len(orders))},
+    "artifacts": [
+        {
+            "type": "image",
+            "mime_type": "image/png",
+            "title": "Synthetic daily orders",
+            "data_base64": base64.b64encode(png_bytes).decode("utf-8"),
+        }
+    ],
+}
 ```
 
 ### Expected output
 
 - `stdout` contains `rendered 7 points`
-- `result` is base64-encoded PNG bytes
-- decoding `result` should yield a valid PNG image
+- `result.summary.points` is `7`
+- `result.artifacts[0].mime_type` is `image/png`
+- decoding `result.artifacts[0].data_base64` yields a valid PNG image
 
 ### Why this demo works
 
@@ -243,6 +256,7 @@ class names and dataset dimensions are the real invariants to demo.
 ### Python snippet
 
 ```python
+import base64
 import io
 import json
 import urllib.request
@@ -270,14 +284,29 @@ ax.grid(alpha=0.3)
 
 buf = io.BytesIO()
 fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
-result = buf.getvalue()
+png_bytes = buf.getvalue()
+result = {
+    "summary": {
+        "earthquake_count": int(len(df)),
+        "histogram_bins": 20,
+    },
+    "artifacts": [
+        {
+            "type": "image",
+            "mime_type": "image/png",
+            "title": "USGS earthquakes (last day)",
+            "data_base64": base64.b64encode(png_bytes).decode("utf-8"),
+        }
+    ],
+}
 ```
 
 ### Expected output
 
 - `stdout` contains `fetched N earthquakes`
 - `N` should be greater than `0`, but will vary over time
-- `result` is base64-encoded PNG bytes for a histogram
+- `result.summary.earthquake_count` tracks the fetched row count
+- `result.artifacts[0].mime_type` is `image/png`
 - removing the allowlist or changing it to a non-matching host should fail
 
 ### Why this demo works

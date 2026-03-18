@@ -1,6 +1,6 @@
 {
   "id": "python-tools-system",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "name": "Python Tools (System Python)",
   "description": "Python sandbox worker (sidecar) using system Python only (no bundled runtime).",
   "mcp_protocol_version": "2025-06-18",

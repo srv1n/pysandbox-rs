@@ -67,9 +67,9 @@ python3 scripts/plugins/build_bundle.py \
 ```
 
 Output:
-- `dist/plugins/python-tools/0.2.1/macos_universal/python-tools-0.2.1-macos_universal.zip`
-- `dist/plugins/python-tools-system/0.2.1/macos_universal/python-tools-system-0.2.1-macos_universal.zip`
-- `dist/plugins/python-tools-ds/0.2.1/macos_universal/python-tools-ds-0.2.1-macos_universal.zip`
+- `dist/plugins/python-tools/0.2.2/macos_universal/python-tools-0.2.2-macos_universal.zip`
+- `dist/plugins/python-tools-system/0.2.2/macos_universal/python-tools-system-0.2.2-macos_universal.zip`
+- `dist/plugins/python-tools-ds/0.2.2/macos_universal/python-tools-ds-0.2.2-macos_universal.zip`
 
 If `RZN_MACOS_CODESIGN_IDENTITY` is set, Mach-O payloads in the bundle are codesigned using:
 - `entitlements/RznPythonWorker.entitlements` (worker)
@@ -292,8 +292,10 @@ Default targets:
 - local: `http://localhost:8082`
 - prod: `https://rzn.ai`
 
-The helper builds once, publishes to local first, then reuses the same artifact for production. It
-stops on the first failure so you can report the exact failing stage.
+The helper builds once, publishes to local first, then reuses the same ZIP bytes for production. In
+scoped publisher mode each variant is published independently; in the legacy admin flow the shared
+catalog publish still happens once at the end. The helper stops on the first failure so you can
+report the exact failing stage.
 
 Manual single-target publish:
 
@@ -310,5 +312,5 @@ For production, rerun with:
 export RZN_BACKEND_BASE_URL="https://rzn.ai"
 export RZN_PLATFORM_ADMIN_TOKEN="..."
 
-python3 scripts/publish_python_tools_variants.py --channel stable --skip-build --skip-upload
+python3 scripts/publish_python_tools_variants.py --channel stable --skip-build
 ```
