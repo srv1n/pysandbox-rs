@@ -103,6 +103,18 @@ quick_starts:
     tool_id: "mcp:plugin.python-tools-ds.python:rzn.worker.health"
     args: {}
     group_id: "diagnostics"
+    requirements:
+      variant: ["python-tools-ds"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "ok"
+          type: "boolean"
+        - path: "worker"
+          type: "string"
+        - path: "version"
+          type: "string"
 
   - id: "list_envs"
     title: "List managed envs"
@@ -110,6 +122,18 @@ quick_starts:
     tool_id: "mcp:plugin.python-tools-ds.python:python_env.list"
     args: {}
     group_id: "managed_env_lifecycle"
+    requirements:
+      variant: ["python-tools-ds"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "envs[].alias"
+          type: "string"
+        - path: "envs[].healthy"
+          type: "boolean"
+        - path: "envs[].python_path"
+          type: "string"
 
   - id: "create_demo_env"
     title: "Create demo env"
@@ -118,6 +142,18 @@ quick_starts:
     args:
       alias: "demo"
     group_id: "managed_env_lifecycle"
+    requirements:
+      variant: ["python-tools-ds"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "alias"
+          type: "string"
+        - path: "created"
+          type: "boolean"
+        - path: "python_path"
+          type: "string"
 
   - id: "run_hello_world"
     title: "Run hello world in sandbox"
@@ -130,6 +166,17 @@ quick_starts:
         result = {"status": "ok", "value": 42}
       inputs: {}
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "status"
+          type: "string"
+        - path: "value"
+          type: "integer"
 
   - id: "run_basic_stats"
     title: "Run basic stats"
@@ -150,6 +197,23 @@ quick_starts:
           "max": max(numbers)
         }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "count"
+          type: "integer"
+        - path: "sum"
+          type: "integer"
+        - path: "mean"
+          type: "number"
+        - path: "min"
+          type: "integer"
+        - path: "max"
+          type: "integer"
 
   - id: "run_order_summary"
     title: "Summarize orders"
@@ -205,15 +269,38 @@ quick_starts:
           "revenue_by_region": revenue_by_region
         }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "order_count"
+          type: "integer"
+        - path: "total_revenue"
+          type: "number"
+        - path: "average_order_value"
+          type: "number"
+        - path: "top_customer.name"
+          type: "string"
+        - path: "top_customer.revenue"
+          type: "number"
+        - path: "largest_order_id"
+          type: "string"
+        - path: "revenue_by_region"
+          type: "object"
+          description: "Map of region code to revenue."
 
   - id: "run_ds_plot_synthetic_orders"
     title: "Plot synthetic orders"
-    description: "Render a deterministic matplotlib chart and return it as PNG bytes."
+    description: "Render a deterministic matplotlib chart and return a normalized PNG artifact bundle."
     tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
     args:
       policy_id: "data_science"
       inputs: {}
       code: |
+        import base64
         import io
         import numpy as np
         import matplotlib.pyplot as plt
@@ -230,9 +317,43 @@ quick_starts:
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+        png_bytes = buf.getvalue()
         print(f"rendered {len(orders)} points")
-        result = buf.getvalue()
+        result = {
+          "summary": {"points": int(len(orders))},
+          "artifacts": [
+            {
+              "type": "image",
+              "mime_type": "image/png",
+              "title": "Synthetic daily orders",
+              "data_base64": base64.b64encode(png_bytes).decode("utf-8")
+            }
+          ]
+        }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["data_science"]
+      python_packages: ["numpy", "matplotlib"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "artifact_bundle_v1"
+      fields:
+        - path: "summary.points"
+          type: "integer"
+        - path: "artifacts[].type"
+          type: "string"
+        - path: "artifacts[].mime_type"
+          type: "string"
+        - path: "artifacts[].title"
+          type: "string"
+        - path: "artifacts[].data_base64"
+          type: "base64"
+    artifact_shapes:
+      - path: "artifacts[]"
+        type: "image"
+        mime_type: "image/png"
+        title: "Synthetic daily orders"
 
   - id: "run_ds_iris_classifier"
     title: "Train iris classifier"
@@ -256,10 +377,26 @@ quick_starts:
           "training_accuracy": round(float(model.score(X, y)), 3)
         }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["data_science"]
+      python_packages: ["scikit-learn"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "samples"
+          type: "integer"
+        - path: "features"
+          type: "integer"
+        - path: "classes[]"
+          type: "string"
+        - path: "training_accuracy"
+          type: "number"
 
   - id: "run_ds_usgs_quakes_chart"
     title: "Chart USGS earthquakes"
-    description: "Fetch public earthquake data from an allowlisted host and render a histogram."
+    description: "Fetch public earthquake data from an allowlisted host and return a normalized histogram artifact bundle."
     tool_id: "mcp:plugin.python-tools-ds.python:python_sandbox"
     args:
       policy_id: "data_science"
@@ -267,6 +404,7 @@ quick_starts:
         - "*.usgs.gov"
       inputs: {}
       code: |
+        import base64
         import io
         import json
         import urllib.request
@@ -294,8 +432,48 @@ quick_starts:
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
-        result = buf.getvalue()
+        png_bytes = buf.getvalue()
+        result = {
+          "summary": {
+            "earthquake_count": int(len(df)),
+            "histogram_bins": 20
+          },
+          "artifacts": [
+            {
+              "type": "image",
+              "mime_type": "image/png",
+              "title": "USGS earthquakes (last day)",
+              "data_base64": base64.b64encode(png_bytes).decode("utf-8")
+            }
+          ]
+        }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["data_science"]
+      network_allowlist: ["*.usgs.gov"]
+      python_packages: ["pandas", "matplotlib"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "artifact_bundle_v1"
+      fields:
+        - path: "summary.earthquake_count"
+          type: "integer"
+        - path: "summary.histogram_bins"
+          type: "integer"
+        - path: "artifacts[].type"
+          type: "string"
+        - path: "artifacts[].mime_type"
+          type: "string"
+        - path: "artifacts[].title"
+          type: "string"
+        - path: "artifacts[].data_base64"
+          type: "base64"
+    artifact_shapes:
+      - path: "artifacts[]"
+        type: "image"
+        mime_type: "image/png"
+        title: "USGS earthquakes (last day)"
 
   - id: "run_in_demo_env"
     title: "Run using managed env"
@@ -309,6 +487,16 @@ quick_starts:
         result = {"python": sys.version.split()[0]}
       inputs: {}
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools-ds"]
+      policy: ["yolo"]
+      managed_env_required: true
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "python"
+          type: "string"
 
 result_handling:
   tools:

@@ -33,6 +33,7 @@ These quick starts now serve two purposes:
 
 - `run_in_demo_env.json` assumes `python_env.create` has already created the `demo` alias.
 - Managed env usage is intended for `policy_id = yolo`.
+- The DS chart quick starts now return normalized `result.summary` + `result.artifacts[]` payloads.
 - The new `run_ds_*` files already target `plugin.python-tools-ds.python`.
 - For `python-tools-system`, replace tool IDs with:
   - `mcp:plugin.python-tools-system.python:<tool_name>`

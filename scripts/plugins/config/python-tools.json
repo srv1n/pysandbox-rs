@@ -1,6 +1,6 @@
 {
   "id": "python-tools",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "name": "Python Tools",
   "description": "Python sandbox worker (sidecar) with bundled/system runtime selection (bundled minimal runtime)",
   "mcp_protocol_version": "2025-06-18",

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -8,6 +9,44 @@ from pathlib import Path
 
 def sh(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
+
+
+def _has_non_empty(value: str | None) -> bool:
+    return bool(value and value.strip())
+
+
+def load_env_file_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"')
+    return values
+
+
+def has_scoped_publisher_setup(root: Path, plugin_id: str) -> bool:
+    if _has_non_empty(os.environ.get("RZN_PLUGIN_PRODUCT_ID")) and _has_non_empty(
+        os.environ.get("RZN_PUBLISHER_KEY")
+    ):
+        return True
+
+    candidates = [
+        root.parent / "backend" / ".secrets" / "plugin-publishers" / f"{plugin_id}.env",
+        root / ".secrets" / f"plugin-publisher-{plugin_id}.env",
+        root / ".secrets" / "plugin-publisher.env",
+    ]
+    for candidate in candidates:
+        values = load_env_file_values(candidate)
+        if _has_non_empty(values.get("RZN_PLUGIN_PRODUCT_ID")) and _has_non_empty(
+            values.get("RZN_PUBLISHER_KEY")
+        ):
+            return True
+
+    return False
 
 
 def main() -> int:
@@ -53,9 +92,12 @@ def main() -> int:
 
     publish_script = root / "scripts/publish_python_tools_release.py"
 
-    # Register all releases first; publish catalog once at the end.
+    # Legacy admin publishing updates the shared catalog once at the end.
+    # Scoped publisher flow publishes each release independently.
     for i, variant in enumerate(variants):
         config_path = root / config_for[variant]
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        scoped_publish = has_scoped_publisher_setup(root, str(config["id"]).strip())
         cmd = [
             "python3",
             str(publish_script),
@@ -73,7 +115,8 @@ def main() -> int:
             cmd += ["--skip-upload"]
 
         is_last = i == (len(variants) - 1)
-        if args.skip_publish or not is_last:
+        should_publish = scoped_publish or is_last
+        if args.skip_publish or not should_publish:
             cmd += ["--skip-publish"]
 
         sh(cmd)
@@ -87,4 +130,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         raise
-

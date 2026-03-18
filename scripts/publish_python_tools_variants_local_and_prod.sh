@@ -23,18 +23,10 @@ Environment:
 
 Fallback:
   RZN_PLATFORM_ADMIN_TOKEN may be used for both targets if appropriate.
+  Scoped publisher credentials may be auto-loaded per variant from:
+    ../backend/.secrets/plugin-publishers/<plugin_id>.env
 EOF
   exit 0
-fi
-
-if [[ -z "${LOCAL_TOKEN}" ]]; then
-  echo "missing RZN_PLATFORM_ADMIN_TOKEN_LOCAL (or shared RZN_PLATFORM_ADMIN_TOKEN)" >&2
-  exit 2
-fi
-
-if [[ -z "${PROD_TOKEN}" ]]; then
-  echo "missing RZN_PLATFORM_ADMIN_TOKEN_PROD (or shared RZN_PLATFORM_ADMIN_TOKEN)" >&2
-  exit 2
 fi
 
 echo "==> publishing python-tools variants to local backend: ${LOCAL_URL}"
@@ -50,7 +42,7 @@ echo "==> publishing python-tools variants to production backend: ${PROD_URL}"
 if ! env \
   RZN_BACKEND_BASE_URL="${PROD_URL}" \
   RZN_PLATFORM_ADMIN_TOKEN="${PROD_TOKEN}" \
-  python3 "${ROOT}/scripts/publish_python_tools_variants.py" --skip-build --skip-upload "$@"; then
+  python3 "${ROOT}/scripts/publish_python_tools_variants.py" --skip-build "$@"; then
   echo "production publish failed: ${PROD_URL}" >&2
   exit 1
 fi

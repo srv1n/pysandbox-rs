@@ -103,6 +103,18 @@ quick_starts:
     tool_id: "mcp:plugin.python-tools.python:rzn.worker.health"
     args: {}
     group_id: "diagnostics"
+    requirements:
+      variant: ["python-tools"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "ok"
+          type: "boolean"
+        - path: "worker"
+          type: "string"
+        - path: "version"
+          type: "string"
 
   - id: "list_envs"
     title: "List managed envs"
@@ -110,6 +122,18 @@ quick_starts:
     tool_id: "mcp:plugin.python-tools.python:python_env.list"
     args: {}
     group_id: "managed_env_lifecycle"
+    requirements:
+      variant: ["python-tools"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "envs[].alias"
+          type: "string"
+        - path: "envs[].healthy"
+          type: "boolean"
+        - path: "envs[].python_path"
+          type: "string"
 
   - id: "create_demo_env"
     title: "Create demo env"
@@ -118,6 +142,18 @@ quick_starts:
     args:
       alias: "demo"
     group_id: "managed_env_lifecycle"
+    requirements:
+      variant: ["python-tools"]
+    result_shape:
+      root: "structuredContent"
+      kind: "object"
+      fields:
+        - path: "alias"
+          type: "string"
+        - path: "created"
+          type: "boolean"
+        - path: "python_path"
+          type: "string"
 
   - id: "run_hello_world"
     title: "Run hello world in sandbox"
@@ -130,6 +166,17 @@ quick_starts:
         result = {"status": "ok", "value": 42}
       inputs: {}
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "status"
+          type: "string"
+        - path: "value"
+          type: "integer"
 
   - id: "run_basic_stats"
     title: "Run basic stats"
@@ -150,6 +197,23 @@ quick_starts:
           "max": max(numbers)
         }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "count"
+          type: "integer"
+        - path: "sum"
+          type: "integer"
+        - path: "mean"
+          type: "number"
+        - path: "min"
+          type: "integer"
+        - path: "max"
+          type: "integer"
 
   - id: "run_order_summary"
     title: "Summarize orders"
@@ -205,6 +269,28 @@ quick_starts:
           "revenue_by_region": revenue_by_region
         }
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools"]
+      policy: ["balanced"]
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "order_count"
+          type: "integer"
+        - path: "total_revenue"
+          type: "number"
+        - path: "average_order_value"
+          type: "number"
+        - path: "top_customer.name"
+          type: "string"
+        - path: "top_customer.revenue"
+          type: "number"
+        - path: "largest_order_id"
+          type: "string"
+        - path: "revenue_by_region"
+          type: "object"
+          description: "Map of region code to revenue."
 
   - id: "run_in_demo_env"
     title: "Run using managed env"
@@ -218,6 +304,16 @@ quick_starts:
         result = {"python": sys.version.split()[0]}
       inputs: {}
     group_id: "sandbox_execution"
+    requirements:
+      variant: ["python-tools"]
+      policy: ["yolo"]
+      managed_env_required: true
+    result_shape:
+      root: "structuredContent.output.result"
+      kind: "json_object"
+      fields:
+        - path: "python"
+          type: "string"
 
 result_handling:
   tools:
