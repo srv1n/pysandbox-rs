@@ -2,6 +2,18 @@
 
 Get up and running with rzn-python-sandbox in 5 minutes.
 
+## Choose Your Install Mode
+
+If you want a machine-local CLI + worker install:
+
+```bash
+make install
+rzn-python-tools status
+```
+
+That path is for running the packaged Python Tools worker and syncing bundled workflows/examples.
+If you want to embed the sandbox crate in your own Rust application, keep reading.
+
 ## Installation
 
 ### 1. Add to Cargo.toml
@@ -206,6 +218,7 @@ let options = ExecutionOptions {
 
 ## Next Steps
 
+- Run `rzn-python-tools workflows sync` if you installed the local CLI bundle
 - Read the [Embedding Guide](EMBEDDING_GUIDE.md) for detailed integration
 - See [Tauri Integration](TAURI_INTEGRATION.md) for desktop apps
 - Check [Dynamic Modules](DYNAMIC_MODULES.md) for package management

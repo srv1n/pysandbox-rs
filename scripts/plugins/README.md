@@ -3,6 +3,15 @@
 This repo can build a signed `python-tools` extension ZIP suitable for the RZN desktop host
 (`rznapp`) **Install from file…** loop.
 
+If you want a machine-local install you can invoke from anywhere on your Mac, do not use the plugin
+ZIP path. Use:
+
+```bash
+make install
+```
+
+That produces a local CLI/runtime install. This README is about the host plugin bundle path.
+
 Outputs land in `dist/plugins/<id>/<version>/<platform>/` with:
 - `plugin.json`
 - `plugin.sig`
@@ -23,7 +32,7 @@ That means:
 - register the release with the backend,
 - publish the catalog,
 - run the flow against local `http://localhost:8082` first,
-- then run it against production `https://rzn.ai`.
+- then run it against cloud `https://cloud.rzn.ai`.
 
 If either publish target fails, stop there and report what failed.
 
@@ -71,7 +80,7 @@ In `rznapp`:
 
 ## Backend Publish Helpers
 
-For local-first then production publish:
+For local-first then cloud publish:
 
 ```bash
 export R2_PLUGINS_BUCKET=...
@@ -87,6 +96,8 @@ bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
 The helper publishes to:
 
 - local: `http://localhost:8082`
-- prod: `https://rzn.ai`
+- cloud: `https://cloud.rzn.ai`
 
-It stops on the first failure and prints which target failed.
+It stops on the first failure and prints which target failed. `RZN_BACKEND_BASE_URL_PROD` remains
+accepted as a legacy alias for the cloud target, but new automation should prefer
+`RZN_BACKEND_BASE_URL_CLOUD`.

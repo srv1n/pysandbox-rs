@@ -7,6 +7,29 @@ This repo builds signed extension ZIPs (plugin bundles) containing:
 
 The fastest demo loop is **Install from file…** in the desktop host (`rznapp`).
 
+## 0) Decide which install path you want
+
+There are now two real install contracts:
+
+| Goal | Command | Output |
+| --- | --- | --- |
+| Install a machine-local CLI + worker you can invoke from anywhere | `make install` | `~/.local/bin/rzn-python-tools` + `~/.local/bin/rzn-python-worker` |
+| Build plugin ZIPs for `rznapp` install-from-file or backend publish | `make release-plugins` | `dist/plugins/.../*.zip` |
+| Build shell-installable local release artifacts | `make release-installers` | `dist/install/<variant>/<version>/<platform>/` |
+
+`make install` defaults to the `ds` variant so the bundled quick starts are actually runnable after
+install. Override with `INSTALL_VARIANT=minimal` or `INSTALL_VARIANT=system` if you want.
+
+After local install:
+
+```bash
+rzn-python-tools status
+rzn-python-tools workflows sync --force
+```
+
+The workflow sync command copies `examples/python_sandbox/` into
+`~/.rzn/python-tools/workflows` by default.
+
 ## Prereqs
 
 - Rust toolchain (`cargo`)
@@ -74,6 +97,39 @@ Output:
 If `RZN_MACOS_CODESIGN_IDENTITY` is set, Mach-O payloads in the bundle are codesigned using:
 - `entitlements/RznPythonWorker.entitlements` (worker)
 - `entitlements/RznPythonInherit.entitlements` (bundled python executable)
+
+## 3b) Build shell-installable local release artifacts
+
+Fast path:
+
+```bash
+make release-installers
+```
+
+Single-variant build:
+
+```bash
+python3 scripts/build_local_release.py --variant ds
+```
+
+Outputs land in:
+
+- `dist/install/ds/0.2.2/macos_universal/rzn-python-tools-0.2.2-macos_universal-ds.tar.gz`
+- `dist/install/ds/0.2.2/macos_universal/install.sh`
+
+Install from a local artifact:
+
+```bash
+sh scripts/install_rzn_python_tools.sh \
+  --artifact-path dist/install/ds/0.2.2/macos_universal/rzn-python-tools-0.2.2-macos_universal-ds.tar.gz
+```
+
+Install from a hosted release:
+
+```bash
+curl -fsSL https://example.invalid/rzn-python-tools/install.sh | \
+  sh -s -- --version 0.2.2 --base-url https://example.invalid/rzn-python-tools --variant ds
+```
 
 ## 4) Install from file in rznapp
 

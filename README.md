@@ -2,6 +2,39 @@
 
 A flexible Python execution sandbox for Rust applications, positioned as RZN infrastructure for safely running model-generated code. The library provides multiple execution engines with different security and performance tradeoffs.
 
+## Local Install
+
+If you want a machine-local install instead of embedding the crate in Rust, use:
+
+```bash
+make install
+```
+
+That builds a release-grade local bundle, installs `rzn-python-tools` into `~/.local/bin`,
+installs a wrapped `rzn-python-worker`, and syncs the packaged quick starts into
+`~/.rzn/python-tools/workflows`.
+
+The default install variant is `ds` because bundled workflows should actually run after install.
+Override it if you want a smaller or system-Python setup:
+
+```bash
+make install INSTALL_VARIANT=minimal
+make install INSTALL_VARIANT=system
+```
+
+Useful commands after install:
+
+```bash
+rzn-python-tools status
+rzn-python-tools workflows sync --force
+rzn-python-tools worker
+```
+
+`make release` builds both shell-installable local artifacts under `dist/install/` and the signed
+plugin ZIPs under `dist/plugins/`.
+
+## Library Embedding
+
 ## Features
 
 - **Multiple Execution Engines**: 
@@ -62,23 +95,18 @@ result = np.mean([1, 2, 3, 4, 5])
 }
 ```
 
-## Running the Example
+## Packaged Workflows
 
-The crate includes a comprehensive data analysis example:
+The repo ships a curated quick-start pack in `examples/python_sandbox/quick_starts/`.
 
-```bash
-# Run with native Python engine
-cargo run --example data_analysis
+- `run_basic_stats.json`
+- `run_order_summary.json`
+- `run_ds_plot_synthetic_orders.json`
+- `run_ds_iris_classifier.json`
+- `run_ds_usgs_quakes_chart.json`
 
-# Run with microsandbox support (if available)
-cargo run --example data_analysis --features microsandbox-engine
-```
-
-This example:
-- Generates synthetic sales data
-- Performs statistical analysis
-- Creates matplotlib visualizations
-- Saves output plots to disk
+Use `rzn-python-tools workflows sync` after install to copy the pack into your local workflows
+directory, or point the desktop host at the packaged copy inside an installed plugin bundle.
 
 ## Architecture
 
@@ -164,6 +192,7 @@ See [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md) for setup instructions.
 ## Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
+- **[Python Tools Extension Runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)** - Local install, plugin ZIPs, release artifacts, and publish flow
 - **[Tauri Integration Guide](TAURI_INTEGRATION.md)** - Complete guide for embedding in Tauri applications
 - **[Dynamic Modules Guide](DYNAMIC_MODULES.md)** - How to dynamically download and manage Python modules
 - **[Embedding Guide](EMBEDDING_GUIDE.md)** - General guide for embedding the library in Rust applications

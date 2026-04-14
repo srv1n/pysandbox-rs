@@ -49,5 +49,6 @@ For plugin release work:
 
 - Building a ZIP alone is not enough.
 - Notify the backend through the release registration and catalog publish API flow.
-- Publish to local `http://localhost:8082` first, then production `https://rzn.ai`, unless the user explicitly says otherwise.
-- If local or production publish fails at any stage, stop and report exactly what failed.
+- Publish to local `http://localhost:8082` first, then cloud `https://cloud.rzn.ai`, unless the user explicitly says otherwise.
+- Legacy `_PROD` env overrides may still exist, but new automation should prefer `_CLOUD`.
+- If local or cloud publish fails at any stage, stop and report exactly what failed.

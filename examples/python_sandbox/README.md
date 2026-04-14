@@ -6,6 +6,17 @@ These quick starts now serve two purposes:
 - a curated 5-demo ladder that spans basic Python, business logic, charting,
   ML, and policy-limited public data
 
+If you installed the local CLI bundle, sync this pack into your machine-local workflows directory
+with:
+
+```bash
+rzn-python-tools workflows sync --force
+```
+
+Default sync destination:
+
+- `~/.rzn/python-tools/workflows`
+
 ## Included examples
 
 1. `quick_starts/health_probe.json`
