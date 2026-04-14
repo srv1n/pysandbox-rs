@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with pysandbox-rs in 5 minutes.
+Get up and running with rzn-python-sandbox in 5 minutes.
 
 ## Installation
 
@@ -8,7 +8,7 @@ Get up and running with pysandbox-rs in 5 minutes.
 
 ```toml
 [dependencies]
-pysandbox-rs = { path = "path/to/pysandbox-rs" }
+rzn_python_sandbox = { package = "rzn-python-sandbox", path = "path/to/rzn-python-sandbox" }
 tokio = { version = "1", features = ["full"] }
 serde_json = "1"
 ```
@@ -16,7 +16,7 @@ serde_json = "1"
 ### 2. Basic Usage
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -106,7 +106,7 @@ let inputs = serde_json::json!({ "x": 3.14159 });
 // This will fail - os module is blacklisted
 let code = "import os; result = os.getcwd()";
 match sandbox.execute(code, json!({}), ExecutionOptions::default()).await {
-    Err(pysandbox::SandboxError::ImportRestriction(_)) => {
+    Err(rzn_python_sandbox::SandboxError::ImportRestriction(_)) => {
         println!("Import blocked as expected");
     }
     _ => panic!("Should have failed"),
@@ -128,7 +128,7 @@ let options = ExecutionOptions {
 // This will timeout
 let code = "while True: pass";
 match sandbox.execute(code, json!({}), options).await {
-    Err(pysandbox::SandboxError::Timeout) => {
+    Err(rzn_python_sandbox::SandboxError::Timeout) => {
         println!("Timed out as expected");
     }
     _ => panic!("Should have timed out"),
@@ -138,7 +138,7 @@ match sandbox.execute(code, json!({}), options).await {
 ## Error Handling
 
 ```rust
-use pysandbox::SandboxError;
+use rzn_python_sandbox::SandboxError;
 
 match sandbox.execute(code, inputs, options).await {
     Ok(result) => {
@@ -175,7 +175,7 @@ match sandbox.execute(code, inputs, options).await {
 
 Enable in Cargo.toml:
 ```toml
-pysandbox-rs = { path = "...", features = ["microsandbox-engine"] }
+rzn_python_sandbox = { package = "rzn-python-sandbox", path = "...", features = ["microsandbox-engine"] }
 ```
 
 The sandbox will automatically use microsandbox if available:
@@ -191,7 +191,7 @@ for cap in caps {
 ### Custom Import Policy
 
 ```rust
-use pysandbox::{ExecutionOptions, ImportPolicy};
+use rzn_python_sandbox::{ExecutionOptions, ImportPolicy};
 use std::collections::HashSet;
 
 let mut allowed = HashSet::new();

@@ -1,6 +1,6 @@
 # Embedding Guide
 
-This guide explains how to embed pysandbox-rs in your Rust application as a library.
+This guide explains how to embed rzn-python-sandbox in your Rust application as a library.
 
 ## Table of Contents
 1. [Library Setup](#library-setup)
@@ -14,25 +14,26 @@ This guide explains how to embed pysandbox-rs in your Rust application as a libr
 
 ### Adding as a Dependency
 
-There are several ways to include pysandbox-rs in your project:
+There are several ways to include rzn-python-sandbox in your project:
 
 #### 1. Local Path
 ```toml
 [dependencies]
-pysandbox-rs = { path = "../pysandbox-rs" }
+rzn_python_sandbox = { package = "rzn-python-sandbox", path = "../rzn-python-sandbox" }
 ```
 
 #### 2. Git Repository
 ```toml
 [dependencies]
-pysandbox-rs = { git = "https://github.com/yourusername/pysandbox-rs" }
+rzn_python_sandbox = { package = "rzn-python-sandbox", git = "https://github.com/yourusername/rzn-python-sandbox" }
 ```
 
 #### 3. With Optional Features
 ```toml
 [dependencies]
-pysandbox-rs = { 
-    path = "../pysandbox-rs",
+rzn_python_sandbox = {
+    package = "rzn-python-sandbox",
+    path = "../rzn-python-sandbox",
     features = ["microsandbox-engine"]
 }
 ```
@@ -46,7 +47,7 @@ For larger projects, use a workspace:
 [workspace]
 members = [
     "app",
-    "pysandbox-rs"
+    "rzn-python-sandbox"
 ]
 
 [workspace.dependencies]
@@ -59,7 +60,7 @@ serde = { version = "1.0", features = ["derive"] }
 ### Minimal Example
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,7 +86,7 @@ result = sum([1, 2, 3, 4, 5])
 ### With Input Data
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 use serde_json::json;
 
 async fn process_data(numbers: Vec<f64>) -> Result<f64, Box<dyn std::error::Error>> {
@@ -153,7 +154,7 @@ result = {
 ### Custom Execution Options
 
 ```rust
-use pysandbox::{ExecutionOptions, ImportPolicy};
+use rzn_python_sandbox::{ExecutionOptions, ImportPolicy};
 use std::time::Duration;
 use std::collections::{HashMap, HashSet};
 
@@ -179,7 +180,7 @@ fn create_custom_options() -> ExecutionOptions {
 Create a manager for handling multiple sandboxes:
 
 ```rust
-use pysandbox::{PythonSandbox, create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{PythonSandbox, create_default_sandbox, ExecutionOptions};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use std::collections::HashMap;
@@ -242,7 +243,7 @@ Implement your own execution engine:
 
 ```rust
 use async_trait::async_trait;
-use pysandbox::{
+use rzn_python_sandbox::{
     engine::{PythonEngine, ExecutionOptions, EngineCapabilities},
     errors::{Result, SandboxError},
 };
@@ -297,7 +298,7 @@ impl PythonEngine for CustomEngine {
 ### Comprehensive Error Handling
 
 ```rust
-use pysandbox::{SandboxError, create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{SandboxError, create_default_sandbox, ExecutionOptions};
 
 async fn safe_execute(code: &str) -> Result<String, String> {
     let sandbox = match create_default_sandbox().await {
@@ -639,7 +640,7 @@ mod tests {
 Create `tests/integration_test.rs`:
 
 ```rust
-use pysandbox::*;
+use rzn_python_sandbox::*;
 
 #[tokio::test]
 async fn test_data_processing() {
@@ -706,7 +707,7 @@ pub fn extract_python_runtime(target_dir: &Path) -> Result<(), std::io::Error> {
 ## Example: Complete Application
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions, ImportPolicy};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions, ImportPolicy};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;

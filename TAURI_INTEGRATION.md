@@ -1,6 +1,6 @@
 # Tauri Integration Guide
 
-This guide explains how to embed pysandbox-rs in a Tauri application with dynamic module downloading and management.
+This guide explains how to embed rzn-python-sandbox in a Tauri application with dynamic module downloading and management.
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -13,7 +13,7 @@ This guide explains how to embed pysandbox-rs in a Tauri application with dynami
 
 ## Overview
 
-When integrating pysandbox-rs into a Tauri application, you'll need to:
+When integrating rzn-python-sandbox into a Tauri application, you'll need to:
 - Bundle Python runtime with your app
 - Dynamically download Python packages as needed
 - Expose sandbox functionality through Tauri commands
@@ -28,7 +28,7 @@ In your Tauri app's `src-tauri/Cargo.toml`:
 ```toml
 [dependencies]
 tauri = { version = "1", features = ["shell-open"] }
-pysandbox-rs = { path = "../pysandbox-rs", features = ["microsandbox-engine"] }
+rzn_python_sandbox = { package = "rzn-python-sandbox", path = "../rzn-python-sandbox", features = ["microsandbox-engine"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -52,7 +52,7 @@ your-tauri-app/
 │   │   └── sandbox_service.rs  # Sandbox wrapper service
 │   └── Cargo.toml
 ├── src/                        # Frontend code
-└── pysandbox-rs/              # Embedded sandbox library
+└── rzn-python-sandbox/        # Embedded sandbox library
 ```
 
 ## Dynamic Module Management
@@ -339,7 +339,7 @@ impl PythonManager {
 Create `src-tauri/src/sandbox_service.rs`:
 
 ```rust
-use pysandbox::{PythonSandbox, ExecutionOptions, create_default_sandbox};
+use rzn_python_sandbox::{PythonSandbox, ExecutionOptions, create_default_sandbox};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
@@ -446,7 +446,7 @@ impl SandboxService {
         imports
     }
     
-    pub async fn get_capabilities(&self) -> Vec<pysandbox::engine::EngineCapabilities> {
+    pub async fn get_capabilities(&self) -> Vec<rzn_python_sandbox::engine::EngineCapabilities> {
         let sandbox = self.sandbox.lock().await;
         sandbox.capabilities().await
     }
@@ -542,7 +542,7 @@ pub async fn get_python_info(
 #[tauri::command]
 pub async fn get_sandbox_capabilities(
     state: State<'_, AppState>
-) -> Result<Vec<pysandbox::engine::EngineCapabilities>, String> {
+) -> Result<Vec<rzn_python_sandbox::engine::EngineCapabilities>, String> {
     let service_lock = state.sandbox_service.lock().await;
     let service = service_lock.as_ref()
         .ok_or("Sandbox not initialized")?;
@@ -766,7 +766,7 @@ Always use appropriate security settings:
 
 ```rust
 // In your sandbox_service.rs
-use pysandbox::{ImportPolicy, ResourceLimits};
+use rzn_python_sandbox::{ImportPolicy, ResourceLimits};
 
 let options = ExecutionOptions {
     memory_mb: 512,  // Limit memory

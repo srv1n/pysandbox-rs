@@ -69,6 +69,23 @@ def http_post_json(url: str, token: str, payload: dict) -> dict:
     )
 
 
+def http_request_bytes(
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+) -> bytes:
+    req = urllib.request.Request(url, method=method)
+    for key, value in (headers or {}).items():
+        req.add_header(key, value)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"{method} {url} failed: {e.code} {raw}") from None
+
+
 def ensure_file(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.strip() + "\n", encoding="utf-8")
@@ -127,6 +144,82 @@ def aws_env_from_r2() -> dict:
     return env
 
 
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def artifact_rel_path(artifact_key: str, prefix: str) -> str:
+    normalized = artifact_key.strip().lstrip("/")
+    normalized_prefix = prefix.strip().strip("/")
+    if normalized_prefix and normalized.startswith(f"{normalized_prefix}/"):
+        return normalized[len(normalized_prefix) + 1 :]
+    return normalized
+
+
+def probe_artifact_endpoint(url: str) -> int:
+    req = urllib.request.Request(url, method="GET")
+    opener = urllib.request.build_opener(NoRedirectHandler)
+    try:
+        with opener.open(req, timeout=60) as resp:
+            resp.read(1)
+            return getattr(resp, "status", resp.getcode())
+    except urllib.error.HTTPError as e:
+        if e.code in {301, 302, 303, 307, 308}:
+            return e.code
+        raw = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GET {url} failed: {e.code} {raw}") from None
+
+
+def verify_public_release(
+    public_base: str,
+    *,
+    channel: str,
+    plugin_id: str,
+    version: str,
+    artifact_key: str,
+    r2_prefix: str,
+) -> None:
+    catalog_url = f"{public_base}/plugins/index.json?channel={channel}"
+    sig_url = f"{public_base}/plugins/index.sig?channel={channel}"
+    catalog = http_request_json("GET", catalog_url)
+    sig = http_request_bytes("GET", sig_url).strip()
+    if not sig:
+        raise RuntimeError(f"empty signature served from {sig_url}")
+
+    plugins = catalog.get("plugins")
+    if not isinstance(plugins, list):
+        raise RuntimeError(f"catalog from {public_base} is missing plugins[]")
+
+    plugin_entry = next(
+        (
+            item
+            for item in plugins
+            if item.get("id") == plugin_id and item.get("version") == version
+        ),
+        None,
+    )
+    if plugin_entry is None:
+        raise RuntimeError(
+            f"catalog from {public_base} does not expose {plugin_id}@{version}"
+        )
+
+    rel_path = artifact_rel_path(artifact_key, r2_prefix)
+    expected_url = f"{public_base}/plugins/artifacts/{rel_path}"
+    platforms = plugin_entry.get("platforms") or []
+    platform_entry = next((item for item in platforms if item.get("url") == expected_url), None)
+    if platform_entry is None:
+        raise RuntimeError(
+            f"catalog from {public_base} does not expose artifact url {expected_url}"
+        )
+
+    artifact_status = probe_artifact_endpoint(expected_url)
+    if artifact_status not in {200, 301, 302, 303, 307, 308}:
+        raise RuntimeError(
+            f"artifact probe for {expected_url} returned unexpected status {artifact_status}"
+        )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Build + upload + register + publish python-tools to the backend catalog."
@@ -160,14 +253,18 @@ def main() -> int:
     plugin_id = str(config["id"]).strip()
     version = str(config["version"]).strip()
     maybe_load_seeded_publisher_env(root, plugin_id)
+    r2_prefix = os.environ.get("R2_PLUGINS_PREFIX", "plugins").strip().strip("/")
 
     backend_base = os.environ.get("RZN_BACKEND_BASE_URL", "").strip().rstrip("/")
+    public_base = (
+        os.environ.get("RZN_PLUGIN_PUBLIC_BASE_URL", "").strip().rstrip("/") or backend_base
+    )
     admin_token = os.environ.get("RZN_PLATFORM_ADMIN_TOKEN", "").strip()
     product_id = os.environ.get("RZN_PLUGIN_PRODUCT_ID", "").strip()
     publisher_key = os.environ.get("RZN_PUBLISHER_KEY", "").strip()
     if not backend_base:
         raise RuntimeError(
-            "missing RZN_BACKEND_BASE_URL (e.g. http://localhost:8082 or https://rzn.ai)"
+            "missing RZN_BACKEND_BASE_URL (e.g. http://localhost:8082 or https://cloud.rzn.ai)"
         )
 
     # 1) Build artifacts
@@ -214,7 +311,7 @@ def main() -> int:
             headers=headers,
             payload={
                 "artifact_sha256": digest,
-                "release_notes": "pysandbox-rs publish",
+                "release_notes": "rzn-python-sandbox publish",
                 "metadata": {"artifact_key": upload_data.get("artifact_key")},
             },
         )
@@ -227,6 +324,15 @@ def main() -> int:
                 payload={"channel": args.channel},
             )
             print("published:", published)
+            verify_public_release(
+                public_base,
+                channel=args.channel,
+                plugin_id=plugin_id,
+                version=version,
+                artifact_key=str(upload_data.get("artifact_key") or ""),
+                r2_prefix=r2_prefix,
+            )
+            print("verified catalog + artifact serving")
         return 0
 
     if not admin_token:
@@ -275,17 +381,26 @@ def main() -> int:
             "platform": args.platform,
             "artifact_key": artifact_key,
             "artifact_sha256": digest,
-            "notes": "pysandbox-rs publish",
+            "notes": "rzn-python-sandbox publish",
         },
     )
     print("registered:", reg)
 
     if not args.skip_publish:
-        payload = {"channel": args.channel, "base_url": f"{backend_base}/plugins/artifacts"}
+        payload = {"channel": args.channel, "base_url": f"{public_base}/plugins/artifacts"}
         if args.catalog_version.strip():
             payload["catalog_version"] = args.catalog_version.strip()
         pub = http_post_json(f"{backend_base}/admin/plugins/catalog/publish", admin_token, payload)
         print("published:", pub)
+        verify_public_release(
+            public_base,
+            channel=args.channel,
+            plugin_id=plugin_id,
+            version=version,
+            artifact_key=artifact_key,
+            r2_prefix=r2_prefix,
+        )
+        print("verified catalog + artifact serving")
 
     return 0
 

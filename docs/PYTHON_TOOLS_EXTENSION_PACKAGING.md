@@ -86,7 +86,7 @@ Long-term desired state:
 Recommendation:
 
 - Create or move the `rzn-python-worker` crate into this repo (or a sibling repo that’s “python-tools-worker”).
-- Keep `pysandbox` library here as the sandbox engine dependency for the worker.
+- Keep the `rzn_python_sandbox` library here as the sandbox engine dependency for the worker.
 
 This makes the build/publish loop independent of the desktop repo.
 
@@ -134,10 +134,10 @@ The required sequence is:
 4. Publish the signed catalog: `POST /admin/plugins/catalog/publish`
 5. Treat the release as complete only after this flow succeeds against:
    - local `http://localhost:8082`
-   - production `https://rzn.ai`
+   - cloud `https://cloud.rzn.ai`
 
-If local publish fails, stop there and report the failure. If production publish fails after local
-succeeds, report the production failure explicitly.
+If local publish fails, stop there and report the failure. If cloud publish fails after local
+succeeds, report the cloud failure explicitly.
 
 Backend publishes:
 

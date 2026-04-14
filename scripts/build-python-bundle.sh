@@ -72,7 +72,7 @@ done
 
 # Set default output directory if not specified
 if [ -z "$OUTPUT_DIR" ]; then
-    # Check if we're in pysandbox-rs or rznapp
+    # Check if we're in rzn-python-sandbox or rznapp
     if [ -d "$PROJECT_ROOT/../src-tauri" ]; then
         OUTPUT_DIR="$PROJECT_ROOT/../src-tauri/python"
     elif [ -d "$PROJECT_ROOT/src-tauri" ]; then
@@ -271,6 +271,6 @@ echo "   $OUTPUT_DIR/bin/python3 -c \"import fitz; print('OK')\""
 echo ""
 echo "📝 Next steps:"
 echo "   1. Add to tauri.conf.json resources: [\"python/**/*\"]"
-echo "   2. Update pysandbox-rs to use bundled Python"
+echo "   2. Update rzn-python-sandbox to use bundled Python"
 echo "   3. Run 'cargo tauri build' to include in app"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

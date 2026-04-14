@@ -1,8 +1,8 @@
 /// Example Tauri backend integration
-/// This shows how to integrate pysandbox-rs into a Tauri application
+/// This shows how to integrate rzn-python-sandbox into a Tauri application
 /// For a complete example, see TAURI_INTEGRATION.md
 
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -24,7 +24,7 @@ pub struct ExecutionResult {
 
 // This would be managed by Tauri's state system
 pub struct AppState {
-    sandbox: Arc<Mutex<Option<pysandbox::PythonSandbox>>>,
+    sandbox: Arc<Mutex<Option<rzn_python_sandbox::PythonSandbox>>>,
 }
 
 // Tauri command example

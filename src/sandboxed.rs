@@ -29,7 +29,7 @@ impl Default for SandboxConfig {
         Self {
             python_path: PathBuf::from("python3"),
             sandbox_profile: None,
-            workspace_base: std::env::temp_dir().join("pysandbox-workspaces"),
+            workspace_base: std::env::temp_dir().join("rzn-python-sandbox-workspaces"),
             limits: ResourceLimits::default(),
             input_files: Vec::new(),
         }

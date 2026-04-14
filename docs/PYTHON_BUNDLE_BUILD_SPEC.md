@@ -164,7 +164,7 @@ EOF
 
 ---
 
-## Phase 2: Integration with pysandbox-rs
+## Phase 2: Integration with rzn-python-sandbox
 
 ### 2.1 Required Code Changes
 
@@ -182,7 +182,7 @@ impl NativePythonEngine {
             return Err(SandboxError::PythonNotFound);
         }
 
-        let temp_dir = std::env::temp_dir().join("pysandbox");
+        let temp_dir = std::env::temp_dir().join("rzn-python-sandbox");
         std::fs::create_dir_all(&temp_dir)?;
 
         Ok(Self {
@@ -243,7 +243,7 @@ Add Python bundle to resources:
 **File: `src-tauri/src/commands/python_sandbox.rs`**
 
 ```rust
-use pysandbox::{PythonSandbox, ExecutionOptions, NativePythonEngine};
+use rzn_python_sandbox::{PythonSandbox, ExecutionOptions, NativePythonEngine};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tauri::Manager;
@@ -314,7 +314,7 @@ rznapp/
 │   │               └── matplotlib/
 │   ├── tauri.conf.json
 │   └── src/
-└── pysandbox-rs/                  # Sandbox library
+└── rzn-python-sandbox/            # Sandbox library
 ```
 
 ### 3.2 In Built App (macOS)
@@ -556,8 +556,8 @@ plt.savefig('/tmp/test_plot.png', dpi=100)
 print(f'Plot saved, DataFrame shape: {df.shape}')
 "
 
-# 4. Integration with pysandbox-rs
-cd pysandbox-rs
+# 4. Integration with rzn-python-sandbox
+cd rzn-python-sandbox
 PYTHON_PATH="../src-tauri/python/bin/python3" cargo test
 ```
 

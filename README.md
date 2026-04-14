@@ -1,6 +1,6 @@
-# Python Sandbox for Rust (v2)
+# RZN Python Sandbox
 
-A flexible and secure Python execution sandbox for Rust applications, designed specifically for safely running LLM-generated code. This library provides multiple execution engines with different security/performance tradeoffs.
+A flexible Python execution sandbox for Rust applications, positioned as RZN infrastructure for safely running model-generated code. The library provides multiple execution engines with different security and performance tradeoffs.
 
 ## Features
 
@@ -27,17 +27,17 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-pysandbox = { path = "path/to/pysandbox-rs" }
+rzn_python_sandbox = { package = "rzn-python-sandbox", path = "path/to/rzn-python-sandbox" }
 tokio = { version = "1.42", features = ["full"] }
 
 # Optional: Enable microsandbox support
-# pysandbox = { path = "...", features = ["microsandbox-engine"] }
+# rzn_python_sandbox = { package = "rzn-python-sandbox", path = "...", features = ["microsandbox-engine"] }
 ```
 
 Basic usage:
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -120,7 +120,7 @@ This example:
 ## Configuration
 
 ```rust
-use pysandbox::{ExecutionOptions, ImportPolicy};
+use rzn_python_sandbox::{ExecutionOptions, ImportPolicy};
 use std::time::Duration;
 
 let options = ExecutionOptions {
@@ -154,7 +154,7 @@ For enhanced security using VM-based isolation, you can enable microsandbox supp
 
 ```toml
 [dependencies]
-pysandbox-rs = { version = "0.2", features = ["microsandbox-engine"] }
+rzn_python_sandbox = { package = "rzn-python-sandbox", version = "0.2", features = ["microsandbox-engine"] }
 ```
 
 **Note**: The library includes a custom implementation that works with microsandbox server v0.2.x using JWT authentication. When enabled and the server is running, microsandbox provides security level 9/10 through full VM isolation.
@@ -168,6 +168,7 @@ See [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md) for setup instructions.
 - **[Dynamic Modules Guide](DYNAMIC_MODULES.md)** - How to dynamically download and manage Python modules
 - **[Embedding Guide](EMBEDDING_GUIDE.md)** - General guide for embedding the library in Rust applications
 - **[Microsandbox Guide](MICROSANDBOX_GUIDE.md)** - Setup and configuration for VM-based isolation
+- **[Rename Migration Notes](docs/RENAME_TO_RZN_PYTHON_SANDBOX.md)** - What downstream consumers need to update
 
 ## Error Handling
 

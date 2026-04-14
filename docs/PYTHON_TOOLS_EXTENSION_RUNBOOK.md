@@ -21,7 +21,7 @@ Optional:
 ## 1) Generate a dev signing keypair
 
 ```bash
-cd /Users/sarav/Downloads/side/rzn/pysandbox-rs
+cd /Users/sarav/Downloads/side/rzn/rzn-python-sandbox
 cargo run --bin rzn-plugin-devkit -- keygen --out .secrets/plugin-signing
 ```
 
@@ -256,7 +256,7 @@ Important:
 - Building the ZIP is not enough.
 - "Notify backend" means calling the backend publish APIs, not messaging a human.
 - A release is complete only after the backend register + catalog publish flow succeeds.
-- For local operator flows, publish to local `http://localhost:8082` first and then production `https://rzn.ai`.
+- For local operator flows, publish to local `http://localhost:8082` first and then cloud `https://cloud.rzn.ai`.
 - If any stage fails, stop and report exactly what failed.
 
 Canonical backend runbook:
@@ -274,7 +274,7 @@ Required GitHub Secrets:
 - `RZN_PLATFORM_ADMIN_TOKEN` (must be `platform_admin`)
 - `RZN_PLUGIN_BUNDLE_SIGNING_PRIVATE_KEY_B64` (base64 seed; 32 bytes; 64-byte secrets accepted)
 
-Local then production publish helper (recommended for manual release work):
+Local then cloud publish helper (recommended for manual release work):
 
 ```bash
 export R2_PLUGINS_BUCKET=...
@@ -282,7 +282,7 @@ export R2_PLUGINS_ENDPOINT=...
 export R2_PLUGINS_ACCESS_KEY_ID=...
 export R2_PLUGINS_SECRET_ACCESS_KEY=...
 export RZN_PLATFORM_ADMIN_TOKEN_LOCAL="..."
-export RZN_PLATFORM_ADMIN_TOKEN_PROD="..."
+export RZN_PLATFORM_ADMIN_TOKEN_CLOUD="..."
 
 bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
 ```
@@ -290,9 +290,9 @@ bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
 Default targets:
 
 - local: `http://localhost:8082`
-- prod: `https://rzn.ai`
+- cloud: `https://cloud.rzn.ai`
 
-The helper builds once, publishes to local first, then reuses the same ZIP bytes for production. In
+The helper builds once, publishes to local first, then reuses the same ZIP bytes for cloud. In
 scoped publisher mode each variant is published independently; in the legacy admin flow the shared
 catalog publish still happens once at the end. The helper stops on the first failure so you can
 report the exact failing stage.
@@ -306,10 +306,10 @@ export RZN_PLATFORM_ADMIN_TOKEN="..."
 python3 scripts/publish_python_tools_variants.py --channel stable
 ```
 
-For production, rerun with:
+For cloud, rerun with:
 
 ```bash
-export RZN_BACKEND_BASE_URL="https://rzn.ai"
+export RZN_BACKEND_BASE_URL="https://cloud.rzn.ai"
 export RZN_PLATFORM_ADMIN_TOKEN="..."
 
 python3 scripts/publish_python_tools_variants.py --channel stable --skip-build

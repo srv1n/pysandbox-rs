@@ -34,7 +34,7 @@ A flexible Python sandbox library for Rust with multiple execution engines and s
 ### 3. **Usage Example**
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,4 +1,4 @@
-use pysandbox::{create_sandbox_interactive, engine::ExecutionOptions};
+use rzn_python_sandbox::{create_sandbox_interactive, engine::ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

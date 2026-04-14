@@ -19,7 +19,7 @@ impl MicrosandboxEngine {
 
         Ok(Self {
             name_prefix: format!(
-                "pysandbox-{}",
+                "rzn-python-sandbox-{}",
                 uuid::Uuid::new_v4().to_string()[..8].to_string()
             ),
         })

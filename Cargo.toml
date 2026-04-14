@@ -1,5 +1,5 @@
 [package]
-name = "pysandbox-rs"
+name = "rzn-python-sandbox"
 version = "0.2.0"
 edition = "2021"
 
@@ -44,7 +44,7 @@ default = []
 microsandbox-engine = ["microsandbox"]
 
 [lib]
-name = "pysandbox"
+name = "rzn_python_sandbox"
 crate-type = ["rlib"]
 
 [[example]]

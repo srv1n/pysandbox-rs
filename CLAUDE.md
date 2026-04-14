@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`pysandbox-rs` is a Rust library for executing Python code in a sandboxed environment. It provides security through multiple execution engines with different isolation levels:
+`rzn-python-sandbox` is an RZN infrastructure crate for executing Python code in a sandboxed environment. It provides security through multiple execution engines with different isolation levels:
 - **Native Python Engine**: Process isolation with resource limits (Security Level: 5/10)
 - **Microsandbox Engine**: VM-based isolation using libkrun (Security Level: 9/10)
 

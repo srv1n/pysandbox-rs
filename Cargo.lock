@@ -1053,31 +1053,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pysandbox-rs"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "ed25519-dalek",
- "libc",
- "microsandbox",
- "nix",
- "rand_core",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-test",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "which",
- "windows",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1293,6 +1268,31 @@ name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
+
+[[package]]
+name = "rzn-python-sandbox"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "ed25519-dalek",
+ "libc",
+ "microsandbox",
+ "nix",
+ "rand_core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "which",
+ "windows",
+]
 
 [[package]]
 name = "schannel"

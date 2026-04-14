@@ -1,4 +1,4 @@
-use pysandbox::{
+use rzn_python_sandbox::{
     ExecutionMode, ExecutionOptions, NativePythonEngine, PythonEngine, PythonSandbox,
     SandboxConfig, SandboxedPythonEngine, SecurityProfile,
 };
@@ -300,7 +300,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "rzn_python_worker=info,pysandbox=info".to_string()),
+                .unwrap_or_else(|_| "rzn_python_worker=info,rzn_python_sandbox=info".to_string()),
         )
         .with_target(false)
         .init();

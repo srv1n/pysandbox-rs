@@ -1,5 +1,4 @@
-use pysandbox::{config::ImportPolicy, create_default_sandbox, engine::ExecutionOptions};
-use std::time::Duration;
+use rzn_python_sandbox::{create_default_sandbox, engine::ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

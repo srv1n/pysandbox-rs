@@ -2,7 +2,7 @@
 
 ## Overview
 
-Microsandbox provides the highest level of security for Python execution by running code in isolated micro-VMs. This guide explains how to set up and use microsandbox with pysandbox-rs.
+Microsandbox provides the highest level of security for Python execution by running code in isolated micro-VMs. This guide explains how to set up and use microsandbox with rzn-python-sandbox.
 
 ## Security Levels
 
@@ -93,7 +93,7 @@ msb run microsandbox/python -c "print('Hello from microsandbox!')"
 ### Basic Usage
 
 ```rust
-use pysandbox::{create_default_sandbox, ExecutionOptions};
+use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### With Interactive Setup
 
 ```rust
-use pysandbox::{create_sandbox_interactive, ExecutionOptions};
+use rzn_python_sandbox::{create_sandbox_interactive, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Force Specific Engine
 
 ```rust
-use pysandbox::{create_sandbox_with_options, SandboxOptions};
+use rzn_python_sandbox::{create_sandbox_with_options, SandboxOptions};
 
 // Force microsandbox only (no fallback)
 let sandbox = create_sandbox_with_options(SandboxOptions {
@@ -236,7 +236,7 @@ cargo uninstall microsandbox
 ## FAQ
 
 **Q: Is microsandbox required?**
-A: No, pysandbox-rs falls back to native Python with security restrictions.
+A: No, rzn-python-sandbox falls back to native Python with security restrictions.
 
 **Q: Can I use custom Python packages?**
 A: Currently limited to pre-installed packages in the image.
