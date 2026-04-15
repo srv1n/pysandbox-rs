@@ -1,0 +1,201 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - id: meta
+        name: Validate tag/version sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          python3 scripts/versioning.py check --expected "${version}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  build-system-assets:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux_x86_64
+          - runner: windows-latest
+            platform: windows_x86_64
+          - runner: macos-13
+            platform: macos_x86_64
+          - runner: macos-14
+            platform: macos_aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build system release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/build_local_release.py --variant system
+
+      - name: Upload system release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-${{ matrix.platform }}
+          path: dist/install/system/${{ needs.metadata.outputs.version }}/${{ matrix.platform }}/
+          if-no-files-found: error
+
+  build-macos-plugins:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            platform: macos_x86_64
+          - runner: macos-14
+            platform: macos_aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build macOS plugin bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build_python_tools_variants_macos_host.sh
+
+      - name: Upload macOS plugin zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins-${{ matrix.platform }}
+          path: |
+            dist/plugins/python-tools/${{ needs.metadata.outputs.version }}/${{ matrix.platform }}/*.zip
+            dist/plugins/python-tools-system/${{ needs.metadata.outputs.version }}/${{ matrix.platform }}/*.zip
+            dist/plugins/python-tools-ds/${{ needs.metadata.outputs.version }}/${{ matrix.platform }}/*.zip
+          if-no-files-found: error
+
+  generate-release-notes:
+    needs: metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate notes
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_RELEASE_NOTES_MODEL: ${{ vars.OPENAI_RELEASE_NOTES_MODEL }}
+        run: |
+          python3 scripts/generate_release_notes.py \
+            --tag "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --output release_notes.md
+
+      - name: Upload notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release_notes.md
+          if-no-files-found: error
+
+  publish-release:
+    needs:
+      - metadata
+      - build-system-assets
+      - build-macos-plugins
+      - generate-release-notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Prepare installer assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upload-assets
+          cp scripts/install_rzn_python_tools.sh upload-assets/install-rzn-python-tools.sh
+          cp scripts/install_rzn_python_tools.ps1 upload-assets/install-rzn-python-tools.ps1
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.metadata.outputs.tag }}"
+          version="${{ needs.metadata.outputs.version }}"
+          title="rzn-python-sandbox ${version}"
+          notes_file="release-assets/release-notes/release_notes.md"
+
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release edit "${tag}" --title "${title}" --notes-file "${notes_file}" --latest
+          else
+            gh release create "${tag}" --title "${title}" --notes-file "${notes_file}" --latest
+          fi
+
+          while IFS= read -r -d '' file; do
+            gh release upload "${tag}" "${file}" --clobber
+          done < <(find release-assets -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.sha256' \) -print0 | sort -z)
+
+          gh release upload "${tag}" upload-assets/install-rzn-python-tools.sh upload-assets/install-rzn-python-tools.ps1 --clobber

@@ -5,7 +5,7 @@ INSTALL_ROOT ?= $(HOME)/.local/share/rzn-python-tools
 INSTALL_BIN_DIR ?= $(HOME)/.local/bin
 WORKFLOWS_DIR ?= $(HOME)/.rzn/python-tools/workflows
 
-.PHONY: install build-install-artifact release-installers release-plugins release workflows-sync status
+.PHONY: install build-install-artifact release-installers release-plugins release-artifacts release workflows-sync status
 
 install:
 	artifact="$$(python3 scripts/build_local_release.py --variant $(INSTALL_VARIANT) --print-artifact-path)"; \
@@ -24,7 +24,13 @@ release-installers:
 release-plugins:
 	bash scripts/build_python_tools_variants_macos_universal.sh
 
-release: release-installers release-plugins
+release-artifacts: release-installers release-plugins
+
+release:
+ifndef VERSION
+	$(error VERSION is required. Use `make release VERSION=0.2.3`)
+endif
+	python3 scripts/release.py --version "$(VERSION)"
 
 workflows-sync:
 	"$(INSTALL_BIN_DIR)/rzn-python-tools" workflows sync --dest "$(WORKFLOWS_DIR)"

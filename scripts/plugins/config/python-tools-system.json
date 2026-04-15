@@ -4,7 +4,7 @@
   "name": "Python Tools (System Python)",
   "description": "Python sandbox worker (sidecar) using system Python only (no bundled runtime).",
   "mcp_protocol_version": "2025-06-18",
-  "platforms": ["macos_universal"],
+  "platforms": ["macos_universal", "macos_x86_64", "macos_aarch64"],
   "workers": [
     {
       "id": "python",
@@ -12,7 +12,9 @@
       "auto_start": false,
       "tools_namespace": "plugin:python-tools-system",
       "entrypoints": {
-        "macos_universal": "bin/macos/universal/rzn-python-worker"
+        "macos_universal": "bin/macos/universal/rzn-python-worker",
+        "macos_x86_64": "bin/macos/x86_64/rzn-python-worker",
+        "macos_aarch64": "bin/macos/aarch64/rzn-python-worker"
       },
       "args": [],
       "env": {}
@@ -23,6 +25,18 @@
       "source": "${RZN_PYTHON_WORKER_BIN_MACOS}",
       "dest": "bin/macos/universal/rzn-python-worker",
       "platforms": ["macos_universal"],
+      "mode": "755"
+    },
+    {
+      "source": "${RZN_PYTHON_WORKER_BIN_MACOS_X86_64}",
+      "dest": "bin/macos/x86_64/rzn-python-worker",
+      "platforms": ["macos_x86_64"],
+      "mode": "755"
+    },
+    {
+      "source": "${RZN_PYTHON_WORKER_BIN_MACOS_AARCH64}",
+      "dest": "bin/macos/aarch64/rzn-python-worker",
+      "platforms": ["macos_aarch64"],
       "mode": "755"
     }
   ],

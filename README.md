@@ -30,8 +30,43 @@ rzn-python-tools workflows sync --force
 rzn-python-tools worker
 ```
 
-`make release` builds both shell-installable local artifacts under `dist/install/` and the signed
-plugin ZIPs under `dist/plugins/`.
+## GitHub Releases
+
+The repo is already public at [srv1n/pysandbox-rs](https://github.com/srv1n/pysandbox-rs), and
+public releases are now driven by:
+
+```bash
+make release VERSION=0.2.3
+```
+
+That command syncs release versions, runs `cargo test`, creates an annotated `v0.2.3` tag, and
+pushes it. GitHub Actions builds the actual release assets:
+
+- `linux_x86_64`
+- `windows_x86_64`
+- `macos_x86_64`
+- `macos_aarch64`
+- macOS plugin ZIPs for both Mac architectures
+
+For local packaging without tagging a GitHub release, use:
+
+```bash
+make release-artifacts
+```
+
+Install from GitHub Releases:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/srv1n/pysandbox-rs/main/scripts/install_rzn_python_tools.sh | \
+  sh -s -- --version 0.2.3 --github-repo srv1n/pysandbox-rs --variant system
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_rzn_python_tools.ps1 -Version 0.2.3 -GitHubRepo srv1n/pysandbox-rs
+```
+
+Windows public installs currently ship the `system` variant. Bundled Python release variants remain
+macOS/Linux-only for now.
 
 ## Library Embedding
 
@@ -192,6 +227,7 @@ See [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md) for setup instructions.
 ## Documentation
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
+- **[Release Flow](docs/RELEASE_FLOW.md)** - Tagging, GitHub Actions builds, release notes, and install assets
 - **[Python Tools Extension Runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)** - Local install, plugin ZIPs, release artifacts, and publish flow
 - **[Tauri Integration Guide](TAURI_INTEGRATION.md)** - Complete guide for embedding in Tauri applications
 - **[Dynamic Modules Guide](DYNAMIC_MODULES.md)** - How to dynamically download and manage Python modules

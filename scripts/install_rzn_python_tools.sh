@@ -4,10 +4,11 @@ set -eu
 ARTIFACT_PATH=""
 ARTIFACT_URL=""
 ARTIFACT_BASENAME=""
+GITHUB_REPO="${RZN_PYTHON_TOOLS_GITHUB_REPO:-srv1n/pysandbox-rs}"
 BASE_URL="${RZN_PYTHON_TOOLS_BASE_URL:-}"
 VERSION="${RZN_PYTHON_TOOLS_VERSION:-}"
-VARIANT="${RZN_PYTHON_TOOLS_VARIANT:-ds}"
-PLATFORM="${RZN_PYTHON_TOOLS_PLATFORM:-macos_universal}"
+VARIANT="${RZN_PYTHON_TOOLS_VARIANT:-system}"
+PLATFORM="${RZN_PYTHON_TOOLS_PLATFORM:-auto}"
 INSTALL_ROOT="${RZN_PYTHON_TOOLS_INSTALL_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/rzn-python-tools}"
 BIN_DIR="${RZN_PYTHON_TOOLS_BIN_DIR:-$HOME/.local/bin}"
 WORKFLOWS_DIR="${RZN_PYTHON_TOOLS_WORKFLOWS_DIR:-$HOME/.rzn/python-tools/workflows}"
@@ -19,20 +20,43 @@ Usage:
   sh scripts/install_rzn_python_tools.sh --artifact-path <tar.gz>
 
 Remote install:
-  sh install.sh --version <version> --base-url <https://host/path> [--variant ds]
+  sh install.sh --version <version> [--github-repo owner/repo] [--variant system]
 
 Options:
   --artifact-path PATH
   --artifact-url URL
+  --github-repo owner/repo
   --base-url URL
   --version VERSION
   --variant minimal|ds|system
-  --platform macos_universal
+  --platform auto|linux_x86_64|linux_aarch64|macos_x86_64|macos_aarch64
   --install-root PATH
   --bin-dir PATH
   --workflows-dir PATH
   --skip-workflows-sync
 EOF
+}
+
+detect_platform() {
+  os="$(uname -s)"
+  arch="$(uname -m)"
+  case "$os:$arch" in
+    Darwin:x86_64) echo "macos_x86_64" ;;
+    Darwin:arm64|Darwin:aarch64) echo "macos_aarch64" ;;
+    Linux:x86_64) echo "linux_x86_64" ;;
+    Linux:aarch64|Linux:arm64) echo "linux_aarch64" ;;
+    *)
+      echo "unsupported platform: $os/$arch" >&2
+      exit 2
+      ;;
+  esac
+}
+
+artifact_ext() {
+  case "$1" in
+    windows_*) echo "zip" ;;
+    *) echo "tar.gz" ;;
+  esac
 }
 
 while [ "$#" -gt 0 ]; do
@@ -47,6 +71,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --base-url)
       BASE_URL="$2"
+      shift 2
+      ;;
+    --github-repo)
+      GITHUB_REPO="$2"
       shift 2
       ;;
     --version)
@@ -89,12 +117,21 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+if [ "$PLATFORM" = "auto" ]; then
+  PLATFORM="$(detect_platform)"
+fi
+
 if [ -z "$ARTIFACT_PATH" ] && [ -z "$ARTIFACT_URL" ]; then
-  if [ -z "$BASE_URL" ] || [ -z "$VERSION" ]; then
-    echo "artifact source missing: use --artifact-path, --artifact-url, or --base-url + --version" >&2
+  if [ -n "$BASE_URL" ] && [ -n "$VERSION" ]; then
+    ext="$(artifact_ext "$PLATFORM")"
+    ARTIFACT_URL="${BASE_URL%/}/rzn-python-tools-${VERSION}-${PLATFORM}-${VARIANT}.${ext}"
+  elif [ -n "$VERSION" ]; then
+    ext="$(artifact_ext "$PLATFORM")"
+    ARTIFACT_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/rzn-python-tools-${VERSION}-${PLATFORM}-${VARIANT}.${ext}"
+  else
+    echo "artifact source missing: use --artifact-path, --artifact-url, or --version" >&2
     exit 2
   fi
-  ARTIFACT_URL="${BASE_URL%/}/rzn-python-tools-${VERSION}-${PLATFORM}-${VARIANT}.tar.gz"
 fi
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rzn-python-tools-install.XXXXXX")"

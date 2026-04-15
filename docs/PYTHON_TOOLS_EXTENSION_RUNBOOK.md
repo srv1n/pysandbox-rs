@@ -16,6 +16,7 @@ There are now two real install contracts:
 | Install a machine-local CLI + worker you can invoke from anywhere | `make install` | `~/.local/bin/rzn-python-tools` + `~/.local/bin/rzn-python-worker` |
 | Build plugin ZIPs for `rznapp` install-from-file or backend publish | `make release-plugins` | `dist/plugins/.../*.zip` |
 | Build shell-installable local release artifacts | `make release-installers` | `dist/install/<variant>/<version>/<platform>/` |
+| Tag and publish a public GitHub release | `make release VERSION=0.2.3` | GitHub Release assets + notes |
 
 `make install` defaults to the `ds` variant so the bundled quick starts are actually runnable after
 install. Override with `INSTALL_VARIANT=minimal` or `INSTALL_VARIANT=system` if you want.
@@ -34,8 +35,10 @@ The workflow sync command copies `examples/python_sandbox/` into
 
 - Rust toolchain (`cargo`)
 - Python 3 (`python3`) to run packager scripts
-- macOS (for `macos_universal` bundle)
-  - Bundled runtime directories (`python-bundle-*`) are **gitignored** (generated locally).
+- macOS for plugin ZIP builds
+- macOS or Linux for bundled runtime installer builds
+- Windows currently supports the `system` installer variant only
+- Bundled runtime directories (`python-bundle-*`) are **gitignored** (generated locally).
 
 Optional:
 - Codesigning identity (to enforce App Sandbox at the OS boundary):
@@ -114,21 +117,21 @@ python3 scripts/build_local_release.py --variant ds
 
 Outputs land in:
 
-- `dist/install/ds/0.2.2/macos_universal/rzn-python-tools-0.2.2-macos_universal-ds.tar.gz`
-- `dist/install/ds/0.2.2/macos_universal/install.sh`
+- `dist/install/ds/<version>/<platform>/rzn-python-tools-<version>-<platform>-ds.tar.gz`
+- `dist/install/ds/<version>/<platform>/install.sh`
 
 Install from a local artifact:
 
 ```bash
 sh scripts/install_rzn_python_tools.sh \
-  --artifact-path dist/install/ds/0.2.2/macos_universal/rzn-python-tools-0.2.2-macos_universal-ds.tar.gz
+  --artifact-path dist/install/ds/<version>/<platform>/rzn-python-tools-<version>-<platform>-ds.tar.gz
 ```
 
-Install from a hosted release:
+Install from the public GitHub release:
 
 ```bash
-curl -fsSL https://example.invalid/rzn-python-tools/install.sh | \
-  sh -s -- --version 0.2.2 --base-url https://example.invalid/rzn-python-tools --variant ds
+curl -fsSL https://raw.githubusercontent.com/srv1n/pysandbox-rs/main/scripts/install_rzn_python_tools.sh | \
+  sh -s -- --version <version> --github-repo srv1n/pysandbox-rs --variant system
 ```
 
 ## 4) Install from file in rznapp
