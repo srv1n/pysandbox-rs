@@ -6,6 +6,7 @@ description = "Flexible Python execution sandbox and cross-platform Python tools
 repository = "https://github.com/srv1n/pysandbox-rs"
 homepage = "https://github.com/srv1n/pysandbox-rs"
 readme = "README.md"
+license = "AGPL-3.0-only"
 
 [dependencies]
 anyhow = "1.0.97"

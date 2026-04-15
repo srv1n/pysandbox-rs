@@ -245,3 +245,8 @@ flowchart LR
 - macOS: install bundles and plugin ZIPs supported
 - Windows: public install currently ships the `system` variant
 - Microsandbox support is optional and documented separately in [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md)
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0.
+See [LICENSE](LICENSE) for the full text.
