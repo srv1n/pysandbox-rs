@@ -1,268 +1,247 @@
 # RZN Python Sandbox
 
-A flexible Python execution sandbox for Rust applications, positioned as RZN infrastructure for safely running model-generated code. The library provides multiple execution engines with different security and performance tradeoffs.
+`rzn-python-sandbox` gives you an installable Python runtime for RZN-style tool workflows and a Rust library for embedding the same sandbox in your own app.
 
-## Local Install
+Install it and you get:
 
-If you want a machine-local install instead of embedding the crate in Rust, use:
+- `rzn-python-tools`: a local CLI for status, paths, workflow sync, and worker launch
+- `rzn-python-worker`: an MCP worker that exposes Python execution and env management tools
+- `python_sandbox`: a tool that runs Python with policy, runtime, timeout, and network controls
+- optional bundled Python, so you do not have to depend on whatever the host machine happens to have
+- app-scoped managed virtual environments for YOLO flows
+- ready-made quick starts for stats, business logic, charts, ML, and public-data fetches
+
+## Why this exists
+
+If your product needs Python, the annoying part is rarely `python`. It is the rest:
+
+- picking a runtime
+- keeping dependencies under control
+- deciding what the code is allowed to do
+- returning JSON and files in a shape the host can actually use
+- making the install story sane
+
+This repo exists to handle that once instead of rebuilding it in every host app.
+
+Try it if you need Python for transforms, analysis, charting, or ML, but you do not want to hand your app a raw interpreter and hope for the best.
+
+## What You Get
+
+| Piece | What it does |
+| --- | --- |
+| `rzn-python-tools` | Shows install state, resolves paths, syncs packaged workflows, and launches the worker |
+| `rzn-python-worker` | Exposes health checks, managed env lifecycle tools, and `python_sandbox` over MCP stdio |
+| `python_sandbox` | Executes Python with JSON `inputs`, returns `stdout`, structured `result`, and artifacts |
+| Managed env tools | `python_env.list`, `python_env.create`, and `python_env.install` for app-scoped virtualenvs |
+| Quick starts | Copy-pasteable workflow payloads in [`examples/python_sandbox/quick_starts`](examples/python_sandbox/quick_starts/) |
+
+## Install
+
+### Fastest local install
 
 ```bash
 make install
-```
-
-That builds a release-grade local bundle, installs `rzn-python-tools` into `~/.local/bin`,
-installs a wrapped `rzn-python-worker`, and syncs the packaged quick starts into
-`~/.rzn/python-tools/workflows`.
-
-The default install variant is `ds` because bundled workflows should actually run after install.
-Override it if you want a smaller or system-Python setup:
-
-```bash
-make install INSTALL_VARIANT=minimal
-make install INSTALL_VARIANT=system
-```
-
-Useful commands after install:
-
-```bash
 rzn-python-tools status
 rzn-python-tools workflows sync --force
-rzn-python-tools worker
 ```
 
-## GitHub Releases
+That installs:
 
-The repo is already public at [srv1n/pysandbox-rs](https://github.com/srv1n/pysandbox-rs), and
-public releases are now driven by:
+- `~/.local/bin/rzn-python-tools`
+- `~/.local/bin/rzn-python-worker`
+- bundled examples and quick starts under `~/.rzn/python-tools/workflows`
 
-```bash
-make release VERSION=0.2.3
-```
+### Install from a GitHub release
 
-That command syncs release versions, runs `cargo test`, creates an annotated `v0.2.3` tag, and
-pushes it. GitHub Actions builds the actual release assets:
-
-- `linux_x86_64`
-- `windows_x86_64`
-- `macos_x86_64`
-- `macos_aarch64`
-- macOS plugin ZIPs for both Mac architectures
-
-For local packaging without tagging a GitHub release, use:
-
-```bash
-make release-artifacts
-```
-
-Install from GitHub Releases:
+The public repo is still [`srv1n/pysandbox-rs`](https://github.com/srv1n/pysandbox-rs), so release assets live there.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/srv1n/pysandbox-rs/main/scripts/install_rzn_python_tools.sh | \
-  sh -s -- --version 0.2.3 --github-repo srv1n/pysandbox-rs --variant system
+  sh -s -- --version <version> --github-repo srv1n/pysandbox-rs --variant system
 ```
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install_rzn_python_tools.ps1 -Version 0.2.3 -GitHubRepo srv1n/pysandbox-rs
+powershell -ExecutionPolicy Bypass -File .\scripts\install_rzn_python_tools.ps1 -Version <version> -GitHubRepo srv1n/pysandbox-rs
 ```
 
-Windows public installs currently ship the `system` variant. Bundled Python release variants remain
-macOS/Linux-only for now.
+### Pick the right variant
 
-## Library Embedding
+| Variant | Use it when |
+| --- | --- |
+| `system` | You want the smallest install and trust the machine's Python |
+| `minimal` | You want a bundled Python runtime without the data-science stack |
+| `ds` | You want bundled Python plus NumPy, Pandas, Matplotlib, and scikit-learn demos |
 
-## Features
+## How It Works
 
-- **Multiple Execution Engines**: 
-  - Native Python with resource limits and import controls
-  - Microsandbox VM-based isolation (optional)
-  - Extensible trait-based architecture for future engines
-  
-- **Security Guardrails**:
-  - Memory and CPU limits
-  - Process count restrictions  
-  - Import whitelist/blacklist
-  - Timeout protection
-  - Built-in function restrictions
+1. A host app or local operator launches `rzn-python-worker`.
+2. The caller sends Python `code`, JSON `inputs`, a `policy_id`, and optional runtime/env/network settings.
+3. The worker picks a Python runtime and execution mode.
+4. The run returns normalized output: `stdout`, structured JSON, and optional artifacts or exported files.
 
-- **Data Science Ready**:
-  - Pre-configured for NumPy, Pandas, Matplotlib
-  - Handles binary outputs (e.g., plot images)
-  - JSON-based data exchange
+The default policy mapping today is simple:
 
-## Quick Start
+| Policy | Default execution behavior |
+| --- | --- |
+| `balanced` | Native execution with policy controls |
+| `enterprise` | Workspace-isolated execution |
+| `data_science` | Workspace-isolated execution with DS-friendly policy |
+| `document_processing` | Workspace-isolated execution |
+| `yolo` | System Python, intended for managed env workflows |
 
-Add to your `Cargo.toml`:
+The runtime choice is also explicit:
+
+- `auto`: let the worker decide
+- `bundled`: use the packaged Python runtime
+- `system`: use a host Python install
+
+## Example Flows
+
+### 1. Health check the worker
+
+Use this first. If this fails, nothing else matters.
+
+- Tool: `rzn.worker.health`
+- Quick start: [`examples/python_sandbox/quick_starts/health_probe.json`](examples/python_sandbox/quick_starts/health_probe.json)
+- Result: `ok`, worker name, version, and plugin directory
+
+### 2. Run a deterministic JSON transform
+
+This is the smallest useful proof that the contract works.
+
+```json
+{
+  "code": "numbers = inputs['numbers']\nmean = sum(numbers) / len(numbers)\nresult = {'count': len(numbers), 'mean': round(mean, 2)}",
+  "inputs": {
+    "numbers": [12, 19, 7, 25, 14, 22]
+  },
+  "policy_id": "balanced"
+}
+```
+
+Expected result:
+
+```json
+{
+  "count": 6,
+  "mean": 16.5
+}
+```
+
+### 3. Create a managed env and reuse it
+
+This is the app-managed Python path for less restricted workflows.
+
+1. `python_env.create` with `{"alias": "demo"}`
+2. `python_env.install` with `{"alias": "demo", "packages": ["requests==2.32.3"]}`
+3. `python_sandbox` with `{"policy_id": "yolo", "python_env": "demo", ...}`
+
+Use this when you need package installs without mutating the bundled runtime.
+
+### 4. Generate artifacts, not just JSON
+
+The DS quick starts prove the worker can return binary outputs cleanly.
+
+| Flow | Best variant | Quick start | Proof |
+| --- | --- | --- | --- |
+| Basic stats | `python-tools` | [`run_basic_stats.json`](examples/python_sandbox/quick_starts/run_basic_stats.json) | deterministic JSON result |
+| Order summary | `python-tools` | [`run_order_summary.json`](examples/python_sandbox/quick_starts/run_order_summary.json) | business-style grouping and ranking |
+| Synthetic chart | `python-tools-ds` | [`run_ds_plot_synthetic_orders.json`](examples/python_sandbox/quick_starts/run_ds_plot_synthetic_orders.json) | PNG artifact bundle |
+| Iris classifier | `python-tools-ds` | [`run_ds_iris_classifier.json`](examples/python_sandbox/quick_starts/run_ds_iris_classifier.json) | real ML libraries inside the sandbox |
+| USGS chart | `python-tools-ds` | [`run_ds_usgs_quakes_chart.json`](examples/python_sandbox/quick_starts/run_ds_usgs_quakes_chart.json) | outbound fetch behind an allowlist |
+
+## System Integrations
+
+| Integration point | What this repo gives you |
+| --- | --- |
+| RZN desktop / any MCP host | A worker process you can install, launch, and call as tools |
+| Local machine install | A CLI plus a wrapped worker binary that can run outside the host app |
+| Rust application | A crate that exposes `create_default_sandbox()` and related builders |
+| Plugin distribution | Signed macOS plugin ZIPs plus shell-installable release bundles |
+
+### Rust embedding
+
+If you are embedding this in a Rust app instead of installing the worker:
 
 ```toml
 [dependencies]
 rzn_python_sandbox = { package = "rzn-python-sandbox", path = "path/to/rzn-python-sandbox" }
 tokio = { version = "1.42", features = ["full"] }
-
-# Optional: Enable microsandbox support
-# rzn_python_sandbox = { package = "rzn-python-sandbox", path = "...", features = ["microsandbox-engine"] }
 ```
-
-Basic usage:
 
 ```rust
 use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create sandbox with available engines
-    let sandbox = create_default_sandbox().await?;
-    
-    // Python code
-    let code = r#"
-import numpy as np
-result = np.mean([1, 2, 3, 4, 5])
-"#;
-    
-    // Execute with default options
-    let result = sandbox.execute(
-        code,
-        serde_json::json!({}),
-        ExecutionOptions::default()
-    ).await?;
-    
-    println!("Result: {}", result);
-    Ok(())
-}
+let sandbox = create_default_sandbox().await?;
+let result = sandbox
+    .execute("result = {'ok': True}", serde_json::json!({}), ExecutionOptions::default())
+    .await?;
 ```
 
-## Packaged Workflows
+## Diagram Briefs
 
-The repo ships a curated quick-start pack in `examples/python_sandbox/quick_starts/`.
+These are source briefs for the downstream design/render team. Keep the labels literal. The point is clarity, not decoration.
 
-- `run_basic_stats.json`
-- `run_order_summary.json`
-- `run_ds_plot_synthetic_orders.json`
-- `run_ds_iris_classifier.json`
-- `run_ds_usgs_quakes_chart.json`
+### Diagram 1: Product Surface
 
-Use `rzn-python-tools workflows sync` after install to copy the pack into your local workflows
-directory, or point the desktop host at the packaged copy inside an installed plugin bundle.
+Use this to explain what the user gets after install.
 
-## Architecture
-
-```
-┌─────────────────────┐
-│   Your Application  │
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│   PythonSandbox     │ (Main API)
-│  ┌───────────────┐  │
-│  │ PythonEngine  │  │ (Trait)
-│  └───────┬───────┘  │
-└──────────┼──────────┘
-           │
-    ┌──────┴──────┬──────────────┐
-    │             │              │
-┌───▼────┐  ┌────▼────┐  ┌──────▼──────┐
-│Native  │  │Process  │  │Microsandbox │
-│Python  │  │Isolation│  │VM Engine    │
-└────────┘  └─────────┘  └─────────────┘
+```mermaid
+flowchart LR
+  A["Install rzn-python-tools"] --> B["CLI: status / paths / workflows sync / worker"]
+  A --> C["Worker: rzn-python-worker"]
+  C --> D["Tools: health + env lifecycle + python_sandbox"]
+  C --> E["Runtime: bundled Python or system Python"]
+  C --> F["Execution: policy-selected sandbox mode"]
+  C --> G["Outputs: stdout + JSON result + artifacts + exported files"]
 ```
 
-## Security Levels
+### Diagram 2: Request Lifecycle
 
-1. **Native Python with Guardrails** (Level 5/10)
-   - Resource limits via OS mechanisms
-   - Import restrictions
-   - Good for trusted/internal use
+Use this to explain a single `python_sandbox` call from request to result.
 
-2. **Process Isolation** (Level 7/10) 
-   - Subprocess with rlimit/seccomp
-   - Better isolation, moderate overhead
+```mermaid
+sequenceDiagram
+  participant Host as Host App / MCP Client
+  participant Worker as rzn-python-worker
+  participant Policy as Policy + Runtime Resolver
+  participant Engine as Sandbox Engine
+  participant Python as Python Runtime
 
-3. **Microsandbox VM** (Level 9/10)
-   - Full VM isolation
-   - Best security, ~200ms overhead
-
-## Configuration
-
-```rust
-use rzn_python_sandbox::{ExecutionOptions, ImportPolicy};
-use std::time::Duration;
-
-let options = ExecutionOptions {
-    memory_mb: 1024,
-    cpu_seconds: 30,
-    timeout: Duration::from_secs(35),
-    import_policy: ImportPolicy::data_science_whitelist(),
-    env_vars: Default::default(),
-};
+  Host->>Worker: python_sandbox(code, inputs, policy_id, runtime, env, network_allowlist)
+  Worker->>Policy: resolve policy, execution mode, and runtime
+  Policy-->>Worker: execution plan
+  Worker->>Engine: start isolated run
+  Engine->>Python: execute code
+  Python-->>Engine: stdout, result, files
+  Engine-->>Worker: normalized output
+  Worker-->>Host: structuredContent + artifacts
 ```
 
-## Import Policies
+### Diagram 3: Managed Env Lifecycle
 
-```rust
-// Blacklist dangerous modules (default)
-let policy = ImportPolicy::default();
+Use this to explain the less restricted package-install flow.
 
-// Whitelist only data science modules
-let policy = ImportPolicy::data_science_whitelist();
-
-// Custom whitelist
-let mut whitelist = HashSet::new();
-whitelist.insert("numpy".to_string());
-whitelist.insert("pandas".to_string());
-let policy = ImportPolicy::Whitelist(whitelist);
+```mermaid
+flowchart LR
+  A["python_env.create(alias)"] --> B["python_env.install(packages)"]
+  B --> C["python_sandbox(policy_id=yolo, python_env=alias)"]
+  C --> D["Reuse same env across later runs"]
 ```
 
-## Microsandbox Integration (Optional)
+## More Docs
 
-For enhanced security using VM-based isolation, you can enable microsandbox support:
+- [Quick Start Guide](QUICKSTART.md)
+- [Python Tools demo ladder](docs/PYTHON_TOOLS_DEMOS.md)
+- [Python Tools extension runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)
+- [Release flow](docs/RELEASE_FLOW.md)
+- [Embedding guide](EMBEDDING_GUIDE.md)
+- [Microsandbox guide](MICROSANDBOX_GUIDE.md)
+- [Rename notes](docs/RENAME_TO_RZN_PYTHON_SANDBOX.md)
 
-```toml
-[dependencies]
-rzn_python_sandbox = { package = "rzn-python-sandbox", version = "0.2", features = ["microsandbox-engine"] }
-```
+## Platform Notes
 
-**Note**: The library includes a custom implementation that works with microsandbox server v0.2.x using JWT authentication. When enabled and the server is running, microsandbox provides security level 9/10 through full VM isolation.
-
-See [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md) for setup instructions.
-
-## Documentation
-
-- **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
-- **[Release Flow](docs/RELEASE_FLOW.md)** - Tagging, GitHub Actions builds, release notes, and install assets
-- **[Python Tools Extension Runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)** - Local install, plugin ZIPs, release artifacts, and publish flow
-- **[Tauri Integration Guide](TAURI_INTEGRATION.md)** - Complete guide for embedding in Tauri applications
-- **[Dynamic Modules Guide](DYNAMIC_MODULES.md)** - How to dynamically download and manage Python modules
-- **[Embedding Guide](EMBEDDING_GUIDE.md)** - General guide for embedding the library in Rust applications
-- **[Microsandbox Guide](MICROSANDBOX_GUIDE.md)** - Setup and configuration for VM-based isolation
-- **[Rename Migration Notes](docs/RENAME_TO_RZN_PYTHON_SANDBOX.md)** - What downstream consumers need to update
-
-## Error Handling
-
-The library provides detailed error types:
-
-```rust
-match sandbox.execute(code, inputs, options).await {
-    Ok(result) => println!("Success: {}", result),
-    Err(SandboxError::Timeout) => println!("Execution timed out"),
-    Err(SandboxError::MemoryLimitExceeded) => println!("Out of memory"),
-    Err(SandboxError::ImportNotAllowed(module)) => {
-        println!("Import {} not allowed", module)
-    }
-    Err(e) => println!("Error: {}", e),
-}
-```
-
-## Platform Support
-
-- **Linux**: Full support (all engines)
-- **macOS**: Full support (all engines)
-- **Windows**: Native engine only (microsandbox coming soon)
-
-## Requirements
-
-- Rust 1.70+
-- Python 3.8+ (for native engine)
-- Virtualization support (for microsandbox)
-
-## License
-
-See LICENSE file in the repository.
+- Linux: install bundles supported
+- macOS: install bundles and plugin ZIPs supported
+- Windows: public install currently ships the `system` variant
+- Microsandbox support is optional and documented separately in [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md)
