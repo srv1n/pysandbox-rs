@@ -32,6 +32,12 @@ rzn-python-tools workflows sync --force
 The workflow sync command copies `examples/python_sandbox/` into
 `~/.rzn/python-tools/workflows` by default.
 
+Good first signs:
+
+- `rzn-python-tools status` prints a real `install_root`, `worker`, and `workflows_source`
+- `bundled_python: true` for `minimal` and `ds` installs
+- the synced workflows directory contains `run_basic_stats.json` and the DS quick starts you expect
+
 ## Prereqs
 
 - Rust toolchain (`cargo`)
@@ -189,6 +195,14 @@ worker over MCP, and verifies:
 - deterministic quick starts
 - DS artifact output
 - a negative network-allowlist case
+
+If `make verify` passes, you have evidence for all of these at once:
+
+- the packaged install artifact is structurally valid
+- the installed CLI can locate its manifest and worker
+- the installed worker can answer MCP requests
+- the bundled quick starts are not stale fiction
+- the negative security guard still trips under a fresh install
 
 The publish verification hook is separate:
 

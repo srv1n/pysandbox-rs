@@ -1,22 +1,42 @@
 # Quick Start Guide
 
-Get up and running with rzn-python-sandbox in 5 minutes.
+This repo has two real entry points:
 
-## Choose Your Install Mode
+- install the packaged CLI + worker and verify the full local experience
+- embed the Rust crate directly in your app
 
-If you want a machine-local CLI + worker install:
+If you are unsure which one you want, start with the packaged install. It is the fastest way to answer “does this thing actually work on this machine?”
+
+## 1. Install It and Trust It
+
+Run this from the repo root:
 
 ```bash
 make install
 rzn-python-tools status
+rzn-python-tools workflows sync --force
+make verify
 ```
 
-That path is for running the packaged Python Tools worker and syncing bundled workflows/examples.
-If you want to embed the sandbox crate in your own Rust application, keep reading.
+What this gives you:
 
-## Installation
+- `make install`: installs `rzn-python-tools` and `rzn-python-worker`
+- `rzn-python-tools status`: shows the installed version, variant, install root, worker path, and workflow source
+- `rzn-python-tools workflows sync --force`: copies the bundled quick starts to your local workflows directory
+- `make verify`: builds a fresh temp install and proves the installed worker can pass health, env lifecycle, deterministic quick starts, DS artifact output, and a negative network-allowlist case
 
-### 1. Add to Cargo.toml
+If `make verify` passes, you have a much stronger signal than “cargo build succeeded.”
+
+Useful follow-up commands:
+
+```bash
+rzn-python-tools paths --json
+rzn-python-tools worker -- --help
+```
+
+## 2. Embed the Rust Crate
+
+If you want the library API instead of the packaged worker, add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -25,224 +45,182 @@ tokio = { version = "1", features = ["full"] }
 serde_json = "1"
 ```
 
-### 2. Basic Usage
+Then start with the smallest useful example:
 
 ```rust
 use rzn_python_sandbox::{create_default_sandbox, ExecutionOptions};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create sandbox
     let sandbox = create_default_sandbox().await?;
-    
-    // Execute Python code
-    let code = "result = 2 + 2";
-    let result = sandbox.execute(
-        code,
-        serde_json::json!({}),
-        ExecutionOptions::default()
-    ).await?;
-    
-    println!("Result: {}", result); // Prints: 4
+
+    let result = sandbox
+        .execute(
+            "numbers = inputs['numbers']\nresult = {'count': len(numbers), 'sum': sum(numbers)}",
+            serde_json::json!({ "numbers": [3, 5, 8] }),
+            ExecutionOptions::default(),
+        )
+        .await?;
+
+    println!("{result}");
     Ok(())
 }
 ```
 
-## Common Use Cases
+Expected result:
 
-### 1. Data Analysis
-
-```rust
-let code = r#"
-import statistics
-data = inputs['numbers']
-result = {
-    'mean': statistics.mean(data),
-    'median': statistics.median(data),
-    'stdev': statistics.stdev(data) if len(data) > 1 else 0
+```json
+{
+  "count": 3,
+  "sum": 16
 }
-"#;
-
-let inputs = serde_json::json!({
-    "numbers": [1.5, 2.3, 3.7, 4.1, 5.9]
-});
-
-let result = sandbox.execute(code, inputs, ExecutionOptions::default()).await?;
 ```
 
-### 2. JSON Processing
+## 3. Common Patterns
+
+### Deterministic transform
 
 ```rust
 let code = r#"
-import json
-data = inputs['data']
-# Transform data
+orders = inputs["orders"]
 result = {
-    'total': sum(item['value'] for item in data),
-    'count': len(data),
-    'items': [item['name'] for item in data]
+    "count": len(orders),
+    "total": round(sum(order["amount"] for order in orders), 2),
 }
 "#;
 
 let inputs = serde_json::json!({
-    "data": [
-        {"name": "A", "value": 10},
-        {"name": "B", "value": 20},
-        {"name": "C", "value": 30}
+    "orders": [
+        { "amount": 10.5 },
+        { "amount": 20.25 },
+        { "amount": 4.25 }
     ]
 });
+
+let result = sandbox
+    .execute(code, inputs, ExecutionOptions::default())
+    .await?;
 ```
 
-### 3. Math Calculations
-
-```rust
-let code = r#"
-import math
-x = inputs['x']
-result = {
-    'sin': math.sin(x),
-    'cos': math.cos(x),
-    'tan': math.tan(x),
-    'sqrt': math.sqrt(abs(x))
-}
-"#;
-
-let inputs = serde_json::json!({ "x": 3.14159 });
-```
-
-## Security Features
-
-### Import Restrictions
-
-```rust
-// This will fail - os module is blacklisted
-let code = "import os; result = os.getcwd()";
-match sandbox.execute(code, json!({}), ExecutionOptions::default()).await {
-    Err(rzn_python_sandbox::SandboxError::ImportRestriction(_)) => {
-        println!("Import blocked as expected");
-    }
-    _ => panic!("Should have failed"),
-}
-```
-
-### Resource Limits
+### Time-bounded execution
 
 ```rust
 use std::time::Duration;
+use rzn_python_sandbox::{ExecutionOptions, SandboxError};
 
 let options = ExecutionOptions {
-    memory_mb: 256,              // 256MB limit
-    cpu_seconds: 5,              // 5 seconds CPU time
-    timeout: Duration::from_secs(10), // 10 seconds wall time
+    timeout: Duration::from_secs(2),
+    cpu_seconds: 1,
+    memory_mb: 256,
     ..Default::default()
 };
 
-// This will timeout
-let code = "while True: pass";
-match sandbox.execute(code, json!({}), options).await {
-    Err(rzn_python_sandbox::SandboxError::Timeout) => {
-        println!("Timed out as expected");
-    }
-    _ => panic!("Should have timed out"),
+match sandbox.execute("while True: pass", serde_json::json!({}), options).await {
+    Err(SandboxError::Timeout) => println!("timed out as expected"),
+    other => panic!("unexpected result: {other:?}"),
 }
 ```
 
-## Error Handling
+### Check engine capabilities
+
+```rust
+let caps = sandbox.capabilities().await;
+for cap in caps {
+    println!(
+        "{} | security={} | numpy={} | pandas={} | matplotlib={}",
+        cap.name, cap.security_level, cap.numpy, cap.pandas, cap.matplotlib
+    );
+}
+```
+
+## 4. Security Reality Check
+
+The crate does not turn Python into magic fairy dust. It gives you explicit lanes with different tradeoffs:
+
+- `balanced`, `data_science`, and `document_processing` default to `workspace_isolated`
+- `enterprise` requires `platform_sandboxed` and fails closed if the host cannot provide it
+- `yolo` is intentionally the least restrictive lane for managed-env workflows
+
+For direct crate usage, import restrictions usually surface as a `RuntimeError` carrying the Python exception text, because the worker wrapper captures Python exceptions and normalizes the result.
+
+Example:
+
+```rust
+use rzn_python_sandbox::{ExecutionOptions, SandboxError};
+
+match sandbox
+    .execute("import os\nresult = os.getcwd()", serde_json::json!({}), ExecutionOptions::default())
+    .await
+{
+    Err(SandboxError::RuntimeError(message)) if message.contains("blacklisted") => {
+        println!("blocked as expected: {message}");
+    }
+    other => panic!("unexpected result: {other:?}"),
+}
+```
+
+## 5. Error Handling That Matches Reality
+
+These are the variants worth handling first:
+
+- `SandboxError::PythonNotFound`
+- `SandboxError::SyntaxError`
+- `SandboxError::RuntimeError`
+- `SandboxError::Timeout`
+- `SandboxError::MemoryLimitExceeded`
+- `SandboxError::ProcessLimitExceeded`
+- `SandboxError::SecurityViolation`
+
+Example:
 
 ```rust
 use rzn_python_sandbox::SandboxError;
 
-match sandbox.execute(code, inputs, options).await {
-    Ok(result) => {
-        println!("Success: {}", result);
-    }
-    Err(e) => {
-        match e {
-            SandboxError::Timeout => {
-                eprintln!("Execution timed out");
-            }
-            SandboxError::MemoryLimit => {
-                eprintln!("Memory limit exceeded");
-            }
-            SandboxError::ImportRestriction(module) => {
-                eprintln!("Import of '{}' is not allowed", module);
-            }
-            SandboxError::SyntaxError(msg) => {
-                eprintln!("Syntax error: {}", msg);
-            }
-            SandboxError::RuntimeError(msg) => {
-                eprintln!("Runtime error: {}", msg);
-            }
-            _ => {
-                eprintln!("Error: {}", e);
-            }
-        }
-    }
+match sandbox.execute(code, inputs, ExecutionOptions::default()).await {
+    Ok(result) => println!("success: {result}"),
+    Err(SandboxError::Timeout) => eprintln!("execution timed out"),
+    Err(SandboxError::MemoryLimitExceeded) => eprintln!("memory limit exceeded"),
+    Err(SandboxError::SecurityViolation(msg)) => eprintln!("security violation: {msg}"),
+    Err(SandboxError::RuntimeError(msg)) => eprintln!("python runtime error: {msg}"),
+    Err(err) => eprintln!("sandbox error: {err}"),
 }
 ```
 
-## Advanced Features
+## 6. Troubleshooting
 
-### Using Microsandbox (VM Isolation)
+### The installed CLI cannot find its files
 
-Enable in Cargo.toml:
-```toml
-rzn_python_sandbox = { package = "rzn-python-sandbox", path = "...", features = ["microsandbox-engine"] }
-```
+Run:
 
-The sandbox will automatically use microsandbox if available:
-```rust
-let sandbox = create_default_sandbox().await?;
-let caps = sandbox.capabilities().await;
-
-for cap in caps {
-    println!("{}: security level {}/10", cap.name, cap.security_level);
-}
-```
-
-### Custom Import Policy
-
-```rust
-use rzn_python_sandbox::{ExecutionOptions, ImportPolicy};
-use std::collections::HashSet;
-
-let mut allowed = HashSet::new();
-allowed.insert("math".to_string());
-allowed.insert("json".to_string());
-
-let options = ExecutionOptions {
-    import_policy: ImportPolicy::Whitelist(allowed),
-    ..Default::default()
-};
-```
-
-## Next Steps
-
-- Run `rzn-python-tools workflows sync` if you installed the local CLI bundle
-- Read the [Embedding Guide](EMBEDDING_GUIDE.md) for detailed integration
-- See [Tauri Integration](TAURI_INTEGRATION.md) for desktop apps
-- Check [Dynamic Modules](DYNAMIC_MODULES.md) for package management
-- Review [Examples](examples/) for more use cases
-
-## Troubleshooting
-
-### Python Not Found
-
-Set the Python path explicitly:
 ```bash
-export PYTHON_SYS_EXECUTABLE=/usr/bin/python3
+rzn-python-tools status
+rzn-python-tools paths --json
 ```
 
-### Module Not Found
+If those fail, your install is broken. Re-run `make install` or reinstall from an artifact.
 
-Install required Python packages:
+### You need to force a Python interpreter
+
+Use:
+
 ```bash
-pip install numpy pandas matplotlib
+RZN_PYTHON_PATH=/absolute/path/to/python3 rzn-python-tools worker
 ```
 
-### Permission Denied
+Or, when calling the worker tool, pass `python_path`.
 
-On Unix systems, ensure the Python executable has execute permissions:
-```bash
-chmod +x /path/to/python3
-```
+### You need a less opinionated runtime lane
+
+- use the `system` variant if you trust the host machine’s Python
+- use `yolo` plus managed envs if you need package installs without mutating the bundled runtime
+
+### Enterprise mode fails on this host
+
+That is expected when the OS-level sandbox boundary is unavailable. The repo now fails closed there on purpose.
+
+## Next Docs
+
+- [README.md](README.md) for the product surface and install choices
+- [docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md) for install-from-file, publish, and verification flows
+- [EMBEDDING_GUIDE.md](EMBEDDING_GUIDE.md) for deeper Rust integration
+- [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md) for optional VM isolation

@@ -37,6 +37,15 @@ Try it if you need Python for transforms, analysis, charting, or ML, but you do 
 | Managed env tools | `python_env.list`, `python_env.create`, and `python_env.install` for app-scoped virtualenvs |
 | Quick starts | Copy-pasteable workflow payloads in [`examples/python_sandbox/quick_starts`](examples/python_sandbox/quick_starts/) |
 
+## Start Here
+
+| If you want to... | Start with... | Why this is the right path |
+| --- | --- | --- |
+| install it on your machine and call Python tools locally | `make install` | fastest way to get the CLI, worker, bundled quick starts, and a sane default runtime |
+| prove the packaged install actually works | `make verify` | runs an end-to-end install, MCP worker launch, quick starts, env lifecycle, DS artifact, and negative security case |
+| install it inside `rznapp` | [docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md) | this is the real install-from-file + publish runbook |
+| embed the sandbox crate in Rust | [QUICKSTART.md](QUICKSTART.md) | shortest accurate path for the library API instead of the packaged worker |
+
 ## Install
 
 ### Fastest local install
@@ -73,6 +82,26 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install_rzn_python_tools.ps1 
 | `system` | You want the smallest install and trust the machine's Python |
 | `minimal` | You want a bundled Python runtime without the data-science stack |
 | `ds` | You want bundled Python plus NumPy, Pandas, Matplotlib, and scikit-learn demos |
+
+## Five-Minute Confidence Path
+
+If you want the shortest path from “installed” to “I actually trust this,” run exactly this:
+
+```bash
+make install
+rzn-python-tools status
+rzn-python-tools workflows sync --force
+make verify
+```
+
+What each step proves:
+
+- `make install`: the repo can build a host-native install artifact and place the CLI + worker where you can invoke them
+- `rzn-python-tools status`: the installed CLI can find its manifest, worker path, workflows source, and bundled/runtime metadata
+- `rzn-python-tools workflows sync --force`: the packaged quick starts are present and copy cleanly into the default workflows directory
+- `make verify`: a fresh temp install can launch the worker over MCP and pass health, env lifecycle, deterministic quick starts, DS artifact generation, and a negative security check
+
+If `make verify` passes, you have something far better than “it built on my machine.”
 
 ## How It Works
 
@@ -236,8 +265,8 @@ flowchart LR
 ## More Docs
 
 - [Quick Start Guide](QUICKSTART.md)
+- [Install + verify runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)
 - [Python Tools demo ladder](docs/PYTHON_TOOLS_DEMOS.md)
-- [Python Tools extension runbook](docs/PYTHON_TOOLS_EXTENSION_RUNBOOK.md)
 - [Release flow](docs/RELEASE_FLOW.md)
 - [Embedding guide](EMBEDDING_GUIDE.md)
 - [Microsandbox guide](MICROSANDBOX_GUIDE.md)

@@ -12,6 +12,15 @@ why this sandbox is useful:
 
 These demos prove the worker contract and the worker-level security story. They do not claim cross-platform OS sandbox parity.
 
+For installation confidence, `make verify` already exercises a subset of this ladder automatically:
+
+- worker health
+- managed env lifecycle
+- basic stats
+- order summary
+- DS chart artifact generation
+- a negative network-allowlist case
+
 ## Recommended progression
 
 ```text
