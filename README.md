@@ -2,6 +2,8 @@
 
 `rzn-python-sandbox` gives you an installable Python runtime for RZN-style tool workflows and a Rust library for embedding the same sandbox in your own app.
 
+The hardening story is blunt: `balanced`, `data_science`, and `document_processing` default to `workspace_isolated`; `enterprise` requires `platform_sandboxed` and now fails closed when that OS-level boundary is unavailable; `yolo` is the app-managed env lane. macOS plugin bundles are still the strongest OS-hardened packaging path today, and there is no cross-platform App Sandbox parity claim here.
+
 Install it and you get:
 
 - `rzn-python-tools`: a local CLI for status, paths, workflow sync, and worker launch
@@ -83,10 +85,10 @@ The default policy mapping today is simple:
 
 | Policy | Default execution behavior |
 | --- | --- |
-| `balanced` | Native execution with policy controls |
-| `enterprise` | Workspace-isolated execution |
-| `data_science` | Workspace-isolated execution with DS-friendly policy |
-| `document_processing` | Workspace-isolated execution |
+| `balanced` | Workspace-isolated execution |
+| `enterprise` | Platform-sandboxed execution, failing closed if the OS boundary is unavailable |
+| `data_science` | Worker-enforced workspace isolation with DS-friendly policy |
+| `document_processing` | Worker-enforced workspace isolation |
 | `yolo` | System Python, intended for managed env workflows |
 
 The runtime choice is also explicit:
@@ -94,6 +96,8 @@ The runtime choice is also explicit:
 - `auto`: let the worker decide
 - `bundled`: use the packaged Python runtime
 - `system`: use a host Python install
+
+`workspace_isolated` is the broadly available secure lane this repo ships today. `platform_sandboxed` is now a stricter lane for `enterprise`, but only on hosts that can actually provide the OS boundary; otherwise the run errors instead of silently downgrading.
 
 ## Example Flows
 
@@ -241,10 +245,15 @@ flowchart LR
 
 ## Platform Notes
 
-- Linux: install bundles supported
-- macOS: install bundles and plugin ZIPs supported
-- Windows: public install currently ships the `system` variant
-- Microsandbox support is optional and documented separately in [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md)
+| Surface | Status |
+| --- | --- |
+| macOS plugin ZIPs | Supported and codesignable; this is the strongest OS-hardened path |
+| macOS/Linux local install bundles | Supported |
+| Windows local install bundles | `system` variant only |
+| Worker secure lanes | `workspace_isolated` broadly, `platform_sandboxed` for `enterprise` on supported hosts |
+| Cross-platform OS sandbox parity | Not claimed yet |
+
+Microsandbox support is optional and documented separately in [MICROSANDBOX_GUIDE.md](MICROSANDBOX_GUIDE.md)
 
 ## License
 

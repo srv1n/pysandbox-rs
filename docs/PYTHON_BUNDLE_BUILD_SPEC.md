@@ -4,7 +4,7 @@
 
 ## Overview
 
-We need to build a standalone Python distribution with pre-installed packages that ships inside the Tauri app bundle. This enables Skills to run Python code without users installing anything.
+We need to build a standalone Python distribution with pre-installed packages that ships inside the Tauri app bundle. This is packaging work, not the worker security boundary story. It enables Skills to run Python code without users installing anything.
 
 ## Target Bundles
 
@@ -14,6 +14,8 @@ We need to build a standalone Python distribution with pre-installed packages th
 | macOS | x86_64 (Intel) | P1 | After ARM works |
 | Windows | x86_64 | P2 | After macOS |
 | Linux | x86_64 | P3 | After Windows |
+
+This table is a bundle roadmap, not a claim about OS-sandbox parity.
 
 ---
 

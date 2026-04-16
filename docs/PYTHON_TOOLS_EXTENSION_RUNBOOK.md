@@ -6,6 +6,7 @@ This repo builds signed extension ZIPs (plugin bundles) containing:
 - optionally a bundled Python runtime under `resources/python/` (the worker can also use system Python)
 
 The fastest demo loop is **Install from file…** in the desktop host (`rznapp`).
+These are packaging lanes, not sandbox guarantees.
 
 ## 0) Decide which install path you want
 
@@ -35,7 +36,7 @@ The workflow sync command copies `examples/python_sandbox/` into
 
 - Rust toolchain (`cargo`)
 - Python 3 (`python3`) to run packager scripts
-- macOS for plugin ZIP builds
+- macOS for plugin ZIP builds and the macOS hardening lane
 - macOS or Linux for bundled runtime installer builds
 - Windows currently supports the `system` installer variant only
 - Bundled runtime directories (`python-bundle-*`) are **gitignored** (generated locally).
@@ -144,7 +145,7 @@ In `rznapp`:
 
 ## 5) Smoke: run `python_sandbox` in Tool Bench
 
-Quick health/echo shims (useful to prove the worker is wired up):
+Quick health/echo shims prove the worker is wired up, but they do not prove install integrity or publish integrity:
 
 ```json
 {}
@@ -171,6 +172,44 @@ Call the `python_sandbox` tool with:
 Expected:
 - `structuredContent.output.stdout` contains `hello`
 - `structuredContent.output.result` contains the JSON result
+
+## 6) Verify the install and publish paths
+
+For a local end-to-end install verification, run:
+
+```bash
+make verify
+```
+
+That path builds a `ds` install artifact, installs it into a temp root, launches the installed
+worker over MCP, and verifies:
+
+- worker health + tool surface
+- managed env create/list/run
+- deterministic quick starts
+- DS artifact output
+- a negative network-allowlist case
+
+The publish verification hook is separate:
+
+The strongest existing verification hook is the publish script:
+
+```bash
+python3 scripts/publish_python_tools_release.py --channel stable
+```
+
+That flow builds or reuses the artifact, uploads it, registers the release, publishes the catalog,
+and then verifies the live catalog and artifact URL. The verification step is real: it checks
+`index.json`, `index.sig`, the versioned plugin entry, and the artifact endpoint.
+
+For the local-then-cloud manual path, use:
+
+```bash
+bash scripts/publish_python_tools_variants_local_and_prod.sh --channel stable
+```
+
+That helper publishes to `http://localhost:8082` first, then `https://cloud.rzn.ai`, and stops on
+the first failure so you can report the exact broken stage.
 
 ### YOLO managed env flow (create → install → run)
 
@@ -221,8 +260,7 @@ Managed env storage root:
 
 ### Artifacts (workspace output export)
 
-In secure policies (`policy_id: enterprise|data_science|document_processing`), the worker uses the
-workspace-isolated engine which exposes:
+In workspace-isolated policies (`policy_id: balanced|data_science|document_processing`), the worker exposes:
 - `OUTPUT_DIR` (write files here)
 - `output_files` in the structured output
 
@@ -234,7 +272,7 @@ Example:
 
 ```json
 {
-  "policy_id": "enterprise",
+  "policy_id": "data_science",
   "code": "import os\\nopen(os.path.join(OUTPUT_DIR,'hello.txt'),'w').write('hi')\\nresult={'files': os.listdir(OUTPUT_DIR)}"
 }
 ```
@@ -257,6 +295,8 @@ The worker selects the interpreter in this order:
 macOS YOLO default:
 - if policy is `yolo` and runtime was not explicitly set by tool args or env (`RZN_PYTHON_RUNTIME`), the worker defaults to `system`.
 - this keeps dev installs compatible with pip-managed local environments while enterprise policies remain sandboxed.
+
+The worker does expose an `execution_mode` override, but that override may only strengthen the effective policy. `enterprise` now resolves to `platform_sandboxed` and errors if the host cannot provide the OS boundary instead of silently dropping to unsandboxed execution.
 
 Managed env override:
 - `python_env` / `pythonEnv` / `env_alias` selects an app-managed virtualenv interpreter.
@@ -291,20 +331,13 @@ In the current implementation, disallowed hosts raise `PermissionError` from a r
 
 ## Sandbox selection (policy → mode)
 
-The host injects `policy_id` for Secure Python calls. The worker maps:
+The host injects `policy_id` for Secure Python calls. The worker now resolves the shared policy templates directly:
 
-- `enterprise` / `data_science` / `document_processing` → `workspace_isolated` (uses `SandboxedPythonEngine`)
-- otherwise → `native` (uses `NativePythonEngine`)
+- `yolo` → `native`
+- `balanced` / `data_science` / `document_processing` → `workspace_isolated`
+- `enterprise` → `platform_sandboxed`
 
-Security profiles:
-
-- `yolo` → `SecurityProfile::Yolo` (no import restrictions)
-- `balanced` → `SecurityProfile::Blacklist`
-- `data_science` / `document_processing` → `SecurityProfile::DataScience`
-- `enterprise` → `SecurityProfile::Strict`
-
-You can override `execution_mode` explicitly (`native`, `workspace_isolated`, `platform_sandboxed`),
-but enterprise-managed `rznapp` installs may strip/override this at the host boundary.
+You can override `execution_mode` explicitly (`native`, `workspace_isolated`, `platform_sandboxed`) when the host supports it, but the override cannot weaken the effective policy.
 
 ## Release publish (backend Option B)
 

@@ -7,7 +7,7 @@ import json
 import platform as py_platform
 import shutil
 import subprocess
-import tarfile
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -120,6 +120,14 @@ def write_zip(zip_path: Path, package_root: Path) -> None:
             archive.write(file_path, arcname=rel_path)
 
 
+def write_tar_gz(tar_path: Path, package_root: Path) -> None:
+    subprocess.run(
+        ["tar", "-C", str(package_root.parent), "-czf", str(tar_path), package_root.name],
+        cwd=REPO_ROOT,
+        check=True,
+    )
+
+
 def build_variant(variant: str) -> Path:
     version = ensure_synced()
     host = detect_host_platform()
@@ -127,55 +135,58 @@ def build_variant(variant: str) -> Path:
     binaries = ensure_release_binaries(host)
 
     staging_root = DIST_ROOT / variant / version / host.key
-    package_root = staging_root / PACKAGE_NAME
-    if package_root.exists():
-        shutil.rmtree(package_root)
-    package_root.mkdir(parents=True, exist_ok=True)
-
-    (package_root / "bin").mkdir(parents=True, exist_ok=True)
-    (package_root / "libexec").mkdir(parents=True, exist_ok=True)
-    (package_root / "resources" / "systems" / "python_sandbox").mkdir(parents=True, exist_ok=True)
-
-    cli_name = f"{PACKAGE_NAME}{host.binary_suffix}"
-    worker_name = f"rzn-python-worker{host.binary_suffix}"
-    shutil.copy2(binaries[PACKAGE_NAME], package_root / "bin" / cli_name)
-    shutil.copy2(binaries["rzn-python-worker"], package_root / "libexec" / worker_name)
-    shutil.copy2(VARIANTS[variant]["system_metadata"], package_root / "resources" / "systems" / "python_sandbox" / "system.metadata.yaml")
-    copy_tree(REPO_ROOT / "examples" / "python_sandbox", package_root / "examples" / "python_sandbox")
-
-    python_bundle = VARIANTS[variant]["python_bundle"]
-    if python_bundle is not None:
-        copy_tree(python_bundle, package_root / "resources" / "python")
-
-    manifest = {
-        "schema_version": 1,
-        "artifact": PACKAGE_NAME,
-        "plugin_variant_id": VARIANTS[variant]["plugin_id"],
-        "variant": variant,
-        "version": version,
-        "cargo_version": read_cargo_version(),
-        "platform": host.key,
-        "description": VARIANTS[variant]["description"],
-        "paths": {
-            "cli": f"bin/{cli_name}",
-            "worker": f"libexec/{worker_name}",
-            "examples": "examples/python_sandbox",
-            "workflows": "examples/python_sandbox/quick_starts",
-            "system_metadata": "resources/systems/python_sandbox/system.metadata.yaml",
-        },
-        "bundled_python": python_bundle is not None,
-    }
-    (package_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
     archive_name = f"{PACKAGE_NAME}-{version}-{host.key}-{variant}{host.archive_ext}"
     archive_path = staging_root / archive_name
+    staging_root.mkdir(parents=True, exist_ok=True)
     if archive_path.exists():
         archive_path.unlink()
-    if host.archive_ext == ".tar.gz":
-        with tarfile.open(archive_path, "w:gz") as archive:
-            archive.add(package_root, arcname=PACKAGE_NAME)
-    else:
-        write_zip(archive_path, package_root)
+
+    with tempfile.TemporaryDirectory(prefix=f"{PACKAGE_NAME}-stage-") as temp_dir:
+        package_root = Path(temp_dir) / PACKAGE_NAME
+        package_root.mkdir(parents=True, exist_ok=True)
+
+        (package_root / "bin").mkdir(parents=True, exist_ok=True)
+        (package_root / "libexec").mkdir(parents=True, exist_ok=True)
+        (package_root / "resources" / "systems" / "python_sandbox").mkdir(parents=True, exist_ok=True)
+
+        cli_name = f"{PACKAGE_NAME}{host.binary_suffix}"
+        worker_name = f"rzn-python-worker{host.binary_suffix}"
+        shutil.copy2(binaries[PACKAGE_NAME], package_root / "bin" / cli_name)
+        shutil.copy2(binaries["rzn-python-worker"], package_root / "libexec" / worker_name)
+        shutil.copy2(
+            VARIANTS[variant]["system_metadata"],
+            package_root / "resources" / "systems" / "python_sandbox" / "system.metadata.yaml",
+        )
+        copy_tree(REPO_ROOT / "examples" / "python_sandbox", package_root / "examples" / "python_sandbox")
+
+        python_bundle = VARIANTS[variant]["python_bundle"]
+        if python_bundle is not None:
+            copy_tree(python_bundle, package_root / "resources" / "python")
+
+        manifest = {
+            "schema_version": 1,
+            "artifact": PACKAGE_NAME,
+            "plugin_variant_id": VARIANTS[variant]["plugin_id"],
+            "variant": variant,
+            "version": version,
+            "cargo_version": read_cargo_version(),
+            "platform": host.key,
+            "description": VARIANTS[variant]["description"],
+            "paths": {
+                "cli": f"bin/{cli_name}",
+                "worker": f"libexec/{worker_name}",
+                "examples": "examples/python_sandbox",
+                "workflows": "examples/python_sandbox/quick_starts",
+                "system_metadata": "resources/systems/python_sandbox/system.metadata.yaml",
+            },
+            "bundled_python": python_bundle is not None,
+        }
+        (package_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+        if host.archive_ext == ".tar.gz":
+            write_tar_gz(archive_path, package_root)
+        else:
+            write_zip(archive_path, package_root)
 
     checksum_path = staging_root / f"{archive_name}.sha256"
     checksum_path.write_text(f"{sha256_file(archive_path)}  {archive_name}\n", encoding="utf-8")

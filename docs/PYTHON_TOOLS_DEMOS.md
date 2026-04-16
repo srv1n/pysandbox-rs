@@ -10,6 +10,8 @@ why this sandbox is useful:
 - scientific Python and ML
 - outbound network under an explicit allowlist
 
+These demos prove the worker contract and the worker-level security story. They do not claim cross-platform OS sandbox parity.
+
 ## Recommended progression
 
 ```text

@@ -1,6 +1,7 @@
 use rzn_python_sandbox::{
-    ExecutionMode, ExecutionOptions, NativePythonEngine, PythonEngine, PythonSandbox,
-    SandboxConfig, SandboxedPythonEngine, SecurityProfile,
+    ExecutionEnvironment, ExecutionMode, ExecutionOptions, NativePythonEngine, PolicyManager,
+    PythonEngine, PythonSandbox, ResourceLimits, SandboxConfig, SandboxPolicy,
+    SandboxedPythonEngine,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -39,6 +40,7 @@ struct WorkerConfig {
     python_runtime_explicit: bool,
     python_path_override: Option<PathBuf>,
     sandbox_profile_path: Option<PathBuf>,
+    enterprise_policy_path: Option<PathBuf>,
 }
 
 impl WorkerConfig {
@@ -57,6 +59,9 @@ impl WorkerConfig {
         let mut python_runtime_explicit = runtime_env.is_some();
         let mut python_path_override = std::env::var("RZN_PYTHON_PATH").ok().map(PathBuf::from);
         let mut sandbox_profile_path = std::env::var("RZN_PYTHON_SANDBOX_PROFILE")
+            .ok()
+            .map(PathBuf::from);
+        let mut enterprise_policy_path = std::env::var("RZN_PYTHON_ENTERPRISE_POLICY")
             .ok()
             .map(PathBuf::from);
 
@@ -84,6 +89,12 @@ impl WorkerConfig {
                     }
                     i += 2;
                 }
+                "--enterprise-policy" => {
+                    if let Some(v) = args.get(i + 1) {
+                        enterprise_policy_path = Some(PathBuf::from(v));
+                    }
+                    i += 2;
+                }
                 _ => i += 1,
             }
         }
@@ -94,6 +105,7 @@ impl WorkerConfig {
             python_runtime_explicit,
             python_path_override,
             sandbox_profile_path,
+            enterprise_policy_path,
         }
     }
 }
@@ -565,34 +577,111 @@ fn policy_id_from_args(args: &Value) -> String {
         .unwrap_or_else(|| "balanced".to_string())
 }
 
-fn map_policy_to_profile(policy_id: &str) -> SecurityProfile {
-    match policy_id {
-        "yolo" => SecurityProfile::Yolo,
-        "enterprise" => SecurityProfile::Strict,
-        "data_science" | "document_processing" => SecurityProfile::DataScience,
-        "balanced" => SecurityProfile::Blacklist,
-        _ => SecurityProfile::Blacklist,
+fn execution_mode_rank(mode: ExecutionMode) -> u8 {
+    match mode {
+        ExecutionMode::Native => 0,
+        ExecutionMode::WorkspaceIsolated => 1,
+        ExecutionMode::PlatformSandboxed => 2,
     }
 }
 
-fn map_policy_to_execution_mode(policy_id: &str) -> ExecutionMode {
-    match policy_id {
-        "enterprise" | "data_science" | "document_processing" => ExecutionMode::WorkspaceIsolated,
-        _ => ExecutionMode::Native,
+fn execution_mode_from_environment(env: ExecutionEnvironment) -> ExecutionMode {
+    match env {
+        ExecutionEnvironment::Native => ExecutionMode::Native,
+        ExecutionEnvironment::WorkspaceIsolated => ExecutionMode::WorkspaceIsolated,
+        ExecutionEnvironment::PlatformSandboxed => ExecutionMode::PlatformSandboxed,
     }
 }
 
-fn execution_mode_from_args(args: &Value, policy_id: &str) -> ExecutionMode {
+fn policy_limits_to_engine_limits(policy: &SandboxPolicy) -> ResourceLimits {
+    let max_processes = match policy.process {
+        rzn_python_sandbox::ProcessPolicy::Blocked => 1,
+        rzn_python_sandbox::ProcessPolicy::AllowList(_) => 4,
+        rzn_python_sandbox::ProcessPolicy::Unrestricted => 50,
+    };
+
+    ResourceLimits {
+        memory_mb: policy.resources.max_memory_mb,
+        cpu_seconds: policy.resources.max_cpu_seconds,
+        max_processes,
+        max_threads: policy.resources.max_threads,
+    }
+}
+
+fn resolve_effective_policy(
+    cfg: &WorkerConfig,
+    policy_id: &str,
+) -> std::result::Result<(SandboxPolicy, Option<String>), Value> {
+    let mut manager = PolicyManager::new();
+    if let Some(path) = cfg.enterprise_policy_path.as_ref() {
+        manager.load_enterprise_policy(path).map_err(|message| {
+            json!({
+                "code": -32000,
+                "message": message,
+                "data": { "enterprise_policy_path": path }
+            })
+        })?;
+    }
+
+    manager.select_policy(policy_id).map_err(|message| {
+        json!({
+            "code": -32602,
+            "message": message,
+            "data": { "policy_id": policy_id }
+        })
+    })?;
+
+    let effective_policy = manager.get_effective_policy().map_err(|message| {
+        json!({
+            "code": -32000,
+            "message": message,
+            "data": { "policy_id": policy_id }
+        })
+    })?;
+
+    Ok((
+        effective_policy,
+        manager.get_enterprise_message().map(|msg| msg.to_string()),
+    ))
+}
+
+fn execution_mode_from_args(
+    args: &Value,
+    policy_id: &str,
+    minimum_mode: ExecutionMode,
+) -> std::result::Result<ExecutionMode, Value> {
     let override_str = args
         .get("execution_mode")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_ascii_lowercase());
-    match override_str.as_deref() {
+    let resolved = match override_str.as_deref() {
         Some("native") => ExecutionMode::Native,
         Some("workspace_isolated") | Some("workspace-isolated") => ExecutionMode::WorkspaceIsolated,
         Some("platform_sandboxed") | Some("platform-sandboxed") => ExecutionMode::PlatformSandboxed,
-        _ => map_policy_to_execution_mode(policy_id),
+        _ => minimum_mode,
+    };
+
+    if execution_mode_rank(resolved) < execution_mode_rank(minimum_mode) {
+        return Err(json!({
+            "code": -32602,
+            "message": format!(
+                "execution_mode={} weakens policy_id={} (minimum required mode: {:?})",
+                match resolved {
+                    ExecutionMode::Native => "native",
+                    ExecutionMode::WorkspaceIsolated => "workspace_isolated",
+                    ExecutionMode::PlatformSandboxed => "platform_sandboxed",
+                },
+                policy_id,
+                minimum_mode,
+            ),
+            "data": {
+                "policy_id": policy_id,
+                "minimum_execution_mode": format!("{:?}", minimum_mode).to_ascii_lowercase(),
+            }
+        }));
     }
+
+    Ok(resolved)
 }
 
 fn runtime_override_from_args(args: &Value) -> Option<PythonRuntime> {
@@ -1110,14 +1199,16 @@ async fn python_sandbox_call(
     let inputs = args.get("inputs").cloned().unwrap_or_else(|| json!({}));
 
     let policy_id = policy_id_from_args(args);
-    let security_profile = map_policy_to_profile(&policy_id);
-    let execution_mode = execution_mode_from_args(args, &policy_id);
+    let (effective_policy, enterprise_message) = resolve_effective_policy(cfg, &policy_id)?;
+    let minimum_mode = execution_mode_from_environment(effective_policy.environment.clone());
+    let execution_mode = execution_mode_from_args(args, &policy_id, minimum_mode)?;
 
+    let timeout_cap = effective_policy.resources.max_timeout_seconds.clamp(1, 600);
     let timeout_seconds = args
         .get("timeout_seconds")
         .and_then(|v| v.as_u64())
         .unwrap_or(30)
-        .clamp(1, 600);
+        .clamp(1, timeout_cap);
 
     let managed_env_alias = parse_python_env_alias(args)?;
     if managed_env_alias.is_some() && policy_id != "yolo" {
@@ -1147,7 +1238,11 @@ async fn python_sandbox_call(
     };
     let network_allowlist = parse_network_allowlist(args)?;
 
-    let limits = security_profile.resource_limits();
+    let limits = policy_limits_to_engine_limits(&effective_policy);
+    let sandbox_profile = effective_policy
+        .custom_sandbox_profile
+        .clone()
+        .or_else(|| cfg.sandbox_profile_path.clone());
 
     let engine: Box<dyn PythonEngine> = match (execution_mode, python_path_opt) {
         (ExecutionMode::Native, Some(p)) => Box::new(
@@ -1161,7 +1256,8 @@ async fn python_sandbox_call(
         (ExecutionMode::WorkspaceIsolated | ExecutionMode::PlatformSandboxed, Some(p)) => {
             let config = SandboxConfig {
                 python_path: p,
-                sandbox_profile: cfg.sandbox_profile_path.clone(),
+                sandbox_profile: sandbox_profile.clone(),
+                require_platform_sandbox: execution_mode == ExecutionMode::PlatformSandboxed,
                 limits: limits.clone(),
                 ..Default::default()
             };
@@ -1183,7 +1279,8 @@ async fn python_sandbox_call(
                 })?;
             let config = SandboxConfig {
                 python_path: sys_path,
-                sandbox_profile: cfg.sandbox_profile_path.clone(),
+                sandbox_profile,
+                require_platform_sandbox: execution_mode == ExecutionMode::PlatformSandboxed,
                 limits: limits.clone(),
                 ..Default::default()
             };
@@ -1196,8 +1293,10 @@ async fn python_sandbox_call(
 
     let sandbox = PythonSandbox::new(vec![engine]);
     let options = ExecutionOptions {
+        memory_mb: limits.memory_mb,
+        cpu_seconds: limits.cpu_seconds,
         timeout: std::time::Duration::from_secs(timeout_seconds),
-        import_policy: security_profile.to_import_policy(),
+        import_policy: effective_policy.imports.to_import_policy(),
         network_allowlist: network_allowlist.clone(),
         env_vars: HashMap::new(),
         ..Default::default()
@@ -1212,7 +1311,14 @@ async fn python_sandbox_call(
                 "content": [{ "type": "text", "text": summary }],
                 "structuredContent": {
                     "policy_id": policy_id,
-                    "security_profile": format!("{:?}", security_profile).to_ascii_lowercase(),
+                    "security_profile": policy_id,
+                    "policy": {
+                        "name": effective_policy.name,
+                        "description": effective_policy.description,
+                        "security_level": effective_policy.security_level(),
+                        "audit_logging": effective_policy.audit_logging,
+                        "enterprise_message": enterprise_message,
+                    },
                     "execution_mode": format!("{:?}", execution_mode).to_ascii_lowercase(),
                     "python": python_resolution,
                     "runtime": format!("{:?}", runtime).to_ascii_lowercase(),
@@ -1226,6 +1332,7 @@ async fn python_sandbox_call(
                     "python": python_resolution,
                     "runtime": format!("{:?}", runtime),
                     "python_env": managed_env_alias.clone(),
+                    "policy_name": effective_policy.name,
                 },
                 "isError": false
             }))
@@ -1283,6 +1390,7 @@ mod tests {
             python_runtime_explicit: explicit,
             python_path_override: None,
             sandbox_profile_path: None,
+            enterprise_policy_path: None,
         }
     }
 
@@ -1313,6 +1421,28 @@ mod tests {
         let cfg = mk_cfg(PythonRuntime::Auto, false);
         let runtime = effective_python_runtime(&cfg, &json!({}), "yolo");
         assert_eq!(runtime, PythonRuntime::System);
+    }
+
+    #[test]
+    fn stronger_execution_override_is_allowed() {
+        let mode = execution_mode_from_args(
+            &json!({ "execution_mode": "platform_sandboxed" }),
+            "balanced",
+            ExecutionMode::WorkspaceIsolated,
+        )
+        .unwrap();
+        assert_eq!(mode, ExecutionMode::PlatformSandboxed);
+    }
+
+    #[test]
+    fn weaker_execution_override_is_rejected() {
+        let err = execution_mode_from_args(
+            &json!({ "execution_mode": "native" }),
+            "enterprise",
+            ExecutionMode::PlatformSandboxed,
+        )
+        .unwrap_err();
+        assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
     }
 
     #[test]

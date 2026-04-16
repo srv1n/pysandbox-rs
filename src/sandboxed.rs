@@ -16,6 +16,8 @@ pub struct SandboxConfig {
     pub python_path: PathBuf,
     /// Path to the sandbox profile file (macOS .sb file)
     pub sandbox_profile: Option<PathBuf>,
+    /// Whether this execution requires an OS-level sandbox boundary.
+    pub require_platform_sandbox: bool,
     /// Base directory for creating isolated workspaces
     pub workspace_base: PathBuf,
     /// Resource limits
@@ -29,6 +31,7 @@ impl Default for SandboxConfig {
         Self {
             python_path: PathBuf::from("python3"),
             sandbox_profile: None,
+            require_platform_sandbox: false,
             workspace_base: std::env::temp_dir().join("rzn-python-sandbox-workspaces"),
             limits: ResourceLimits::default(),
             input_files: Vec::new(),
@@ -385,9 +388,54 @@ if _RZN_NETWORK_ALLOWLIST:
         )
     }
 
+    /// Return true when this execution requires an OS-level sandbox boundary.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    fn platform_sandbox_requested(&self) -> bool {
+        self.config.require_platform_sandbox
+    }
+
+    /// Collect a small set of read-only host paths for bubblewrap.
+    #[cfg(target_os = "linux")]
+    fn linux_ro_bind_paths(&self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        let mut push_unique = |path: PathBuf| {
+            if path.exists() && !paths.iter().any(|existing| existing == &path) {
+                paths.push(path);
+            }
+        };
+
+        if let Some(parent) = self.config.python_path.parent() {
+            if let Some(root) = parent.parent() {
+                let root = root.to_path_buf();
+                if root != PathBuf::from("/") {
+                    push_unique(root);
+                }
+            }
+        }
+
+        for candidate in ["/usr", "/bin", "/lib", "/lib64", "/etc"] {
+            push_unique(PathBuf::from(candidate));
+        }
+
+        paths
+    }
+
+    #[cfg(target_os = "macos")]
+    fn macos_app_sandbox_active(&self) -> bool {
+        std::env::var("APP_SANDBOX_CONTAINER_ID")
+            .ok()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+    }
+
     /// Build the command to execute Python in a sandbox
     #[cfg(target_os = "macos")]
-    fn build_sandboxed_command(&self, workspace: &IsolatedWorkspace) -> Command {
+    fn build_sandboxed_command(
+        &self,
+        workspace: &IsolatedWorkspace,
+        wrapper_code: &str,
+        options: &ExecutionOptions,
+    ) -> Result<Command> {
         if let Some(profile) = &self.config.sandbox_profile {
             if profile.exists() {
                 // Use sandbox-exec with the profile
@@ -412,44 +460,253 @@ if _RZN_NETWORK_ALLOWLIST:
 
                 // Add Python executable
                 cmd.arg(&self.config.python_path);
+                cmd.arg("-c").arg(wrapper_code);
+
+                cmd.env("PYTHONIOENCODING", "utf-8")
+                    .env("SANDBOX_WORKSPACE", &workspace.path)
+                    .env(
+                        "OMP_NUM_THREADS",
+                        self.config.limits.max_threads.to_string(),
+                    )
+                    .env(
+                        "OPENBLAS_NUM_THREADS",
+                        self.config.limits.max_threads.to_string(),
+                    )
+                    .env(
+                        "MKL_NUM_THREADS",
+                        self.config.limits.max_threads.to_string(),
+                    )
+                    .env("HOME", &workspace.path)
+                    .env("TMPDIR", std::env::temp_dir());
+                for (key, value) in &options.env_vars {
+                    cmd.env(key, value);
+                }
 
                 info!(
                     "[SANDBOX] Using macOS sandbox-exec with profile: {:?}",
                     profile
                 );
-                return cmd;
+                return Ok(cmd);
             } else {
-                warn!(
-                    "[SANDBOX] Sandbox profile not found at {:?}, falling back to unsandboxed",
+                return Err(SandboxError::SecurityViolation(format!(
+                    "Platform sandbox requested, but sandbox profile not found at {:?}",
                     profile
-                );
+                )));
             }
         }
 
-        // Fallback: no sandbox-exec, just run Python directly
-        warn!("[SANDBOX] Running without platform sandbox (no profile configured)");
-        Command::new(&self.config.python_path)
+        if self.config.require_platform_sandbox && !self.macos_app_sandbox_active() {
+            return Err(SandboxError::SecurityViolation(
+                "Platform sandbox requested on macOS, but no sandbox profile is configured and the host app sandbox is not active".to_string(),
+            ));
+        }
+
+        if self.macos_app_sandbox_active() {
+            info!("[SANDBOX] Using inherited macOS App Sandbox boundary");
+        } else {
+            warn!("[SANDBOX] Running without platform sandbox (no profile configured)");
+        }
+        let mut cmd = Command::new(&self.config.python_path);
+        cmd.arg("-c").arg(wrapper_code);
+        cmd.env("PYTHONIOENCODING", "utf-8")
+            .env("SANDBOX_WORKSPACE", &workspace.path)
+            .env(
+                "OMP_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "OPENBLAS_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "MKL_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env("HOME", &workspace.path)
+            .env("TMPDIR", std::env::temp_dir());
+        for (key, value) in &options.env_vars {
+            cmd.env(key, value);
+        }
+        Ok(cmd)
     }
 
     #[cfg(target_os = "windows")]
-    fn build_sandboxed_command(&self, _workspace: &IsolatedWorkspace) -> Command {
+    fn build_sandboxed_command(
+        &self,
+        workspace: &IsolatedWorkspace,
+        wrapper_code: &str,
+        options: &ExecutionOptions,
+    ) -> Result<Command> {
         // TODO: Implement Windows Job Objects + Restricted Token
+        if self.platform_sandbox_requested() {
+            return Err(SandboxError::SecurityViolation(
+                "Platform sandbox requested, but Windows sandboxing is not implemented".to_string(),
+            ));
+        }
+
         // For now, just run Python directly
         warn!("[SANDBOX] Windows sandboxing not yet implemented, running unsandboxed");
-        Command::new(&self.config.python_path)
+        let mut cmd = Command::new(&self.config.python_path);
+        cmd.arg("-c").arg(wrapper_code);
+        cmd.env("PYTHONIOENCODING", "utf-8")
+            .env("SANDBOX_WORKSPACE", &workspace.path)
+            .env(
+                "OMP_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "OPENBLAS_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "MKL_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env("HOME", &workspace.path)
+            .env("TMPDIR", std::env::temp_dir());
+        for (key, value) in &options.env_vars {
+            cmd.env(key, value);
+        }
+        Ok(cmd)
     }
 
     #[cfg(target_os = "linux")]
-    fn build_sandboxed_command(&self, workspace: &IsolatedWorkspace) -> Command {
-        // TODO: Implement bubblewrap or seccomp sandboxing
-        // For now, just run Python directly
+    fn build_sandboxed_command(
+        &self,
+        workspace: &IsolatedWorkspace,
+        wrapper_code: &str,
+        options: &ExecutionOptions,
+    ) -> Result<Command> {
+        if let Ok(bwrap_path) = which::which("bwrap") {
+            let mut cmd = Command::new(bwrap_path);
+            cmd.arg("--die-with-parent")
+                .arg("--new-session")
+                .arg("--unshare-user")
+                .arg("--uid")
+                .arg("0")
+                .arg("--gid")
+                .arg("0")
+                .arg("--unshare-pid")
+                .arg("--unshare-ipc")
+                .arg("--unshare-uts")
+                .arg("--unshare-net")
+                .arg("--clearenv")
+                .arg("--setenv")
+                .arg("PATH")
+                .arg("/usr/bin:/bin")
+                .arg("--setenv")
+                .arg("PYTHONIOENCODING")
+                .arg("utf-8")
+                .arg("--setenv")
+                .arg("SANDBOX_WORKSPACE")
+                .arg(&workspace.path)
+                .arg("--setenv")
+                .arg("TMPDIR")
+                .arg("/tmp")
+                .arg("--setenv")
+                .arg("HOME")
+                .arg(&workspace.path)
+                .arg("--setenv")
+                .arg("OMP_NUM_THREADS")
+                .arg(self.config.limits.max_threads.to_string())
+                .arg("--setenv")
+                .arg("OPENBLAS_NUM_THREADS")
+                .arg(self.config.limits.max_threads.to_string())
+                .arg("--setenv")
+                .arg("MKL_NUM_THREADS")
+                .arg(self.config.limits.max_threads.to_string());
+
+            for (key, value) in &options.env_vars {
+                cmd.arg("--setenv").arg(key).arg(value);
+            }
+
+            for path in self.linux_ro_bind_paths() {
+                cmd.arg("--ro-bind").arg(&path).arg(&path);
+            }
+
+            cmd.arg("--bind")
+                .arg(&workspace.path)
+                .arg(&workspace.path)
+                .arg("--proc")
+                .arg("/proc")
+                .arg("--dev")
+                .arg("/dev")
+                .arg("--tmpfs")
+                .arg("/tmp")
+                .arg("--dir")
+                .arg("/var/tmp")
+                .arg("--chdir")
+                .arg(&workspace.path)
+                .arg("--")
+                .arg(&self.config.python_path)
+                .arg("-c")
+                .arg(wrapper_code);
+
+            info!("[SANDBOX] Using Linux bubblewrap sandbox");
+            return Ok(cmd);
+        }
+
+        if self.platform_sandbox_requested() {
+            return Err(SandboxError::SecurityViolation(
+                "Platform sandbox requested on Linux, but bubblewrap (bwrap) is not installed or not on PATH"
+                    .to_string(),
+            ));
+        }
+
         warn!("[SANDBOX] Linux sandboxing not yet implemented, running unsandboxed");
-        Command::new(&self.config.python_path)
+        let mut cmd = Command::new(&self.config.python_path);
+        cmd.arg("-c").arg(wrapper_code);
+        cmd.env("PYTHONIOENCODING", "utf-8")
+            .env("SANDBOX_WORKSPACE", &workspace.path)
+            .env(
+                "OMP_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "OPENBLAS_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "MKL_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env("HOME", &workspace.path)
+            .env("TMPDIR", std::env::temp_dir());
+        for (key, value) in &options.env_vars {
+            cmd.env(key, value);
+        }
+        Ok(cmd)
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    fn build_sandboxed_command(&self, _workspace: &IsolatedWorkspace) -> Command {
-        Command::new(&self.config.python_path)
+    fn build_sandboxed_command(
+        &self,
+        workspace: &IsolatedWorkspace,
+        wrapper_code: &str,
+        options: &ExecutionOptions,
+    ) -> Result<Command> {
+        let mut cmd = Command::new(&self.config.python_path);
+        cmd.arg("-c").arg(wrapper_code);
+        cmd.env("PYTHONIOENCODING", "utf-8")
+            .env("SANDBOX_WORKSPACE", &workspace.path)
+            .env(
+                "OMP_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "OPENBLAS_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env(
+                "MKL_NUM_THREADS",
+                self.config.limits.max_threads.to_string(),
+            )
+            .env("HOME", &workspace.path)
+            .env("TMPDIR", std::env::temp_dir());
+        for (key, value) in &options.env_vars {
+            cmd.env(key, value);
+        }
+        Ok(cmd)
     }
 }
 
@@ -597,32 +854,10 @@ if _exec_error:
         );
 
         // Build sandboxed command
-        let mut cmd = self.build_sandboxed_command(&workspace);
-
-        cmd.arg("-c")
-            .arg(&wrapper_code)
-            .stdin(Stdio::null())
+        let mut cmd = self.build_sandboxed_command(&workspace, &wrapper_code, options)?;
+        cmd.stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .env("PYTHONIOENCODING", "utf-8")
-            .env("SANDBOX_WORKSPACE", &workspace.path);
-
-        // Set thread limits
-        cmd.env(
-            "OMP_NUM_THREADS",
-            self.config.limits.max_threads.to_string(),
-        )
-        .env(
-            "OPENBLAS_NUM_THREADS",
-            self.config.limits.max_threads.to_string(),
-        )
-        .env(
-            "MKL_NUM_THREADS",
-            self.config.limits.max_threads.to_string(),
-        );
-        for (key, value) in &options.env_vars {
-            cmd.env(key, value);
-        }
+            .stderr(Stdio::piped());
 
         fn resolve_export_base_dir() -> Option<PathBuf> {
             if let Ok(v) = std::env::var("RZN_PYTHON_EXPORT_DIR") {
@@ -810,12 +1045,13 @@ if _exec_error:
     }
 
     fn capabilities(&self) -> EngineCapabilities {
-        let has_sandbox = self
-            .config
-            .sandbox_profile
-            .as_ref()
-            .map(|p| p.exists())
-            .unwrap_or(false);
+        let has_sandbox = self.config.require_platform_sandbox
+            || self
+                .config
+                .sandbox_profile
+                .as_ref()
+                .map(|p| p.exists())
+                .unwrap_or(false);
 
         EngineCapabilities {
             name: if has_sandbox {

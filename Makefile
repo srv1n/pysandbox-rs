@@ -5,7 +5,7 @@ INSTALL_ROOT ?= $(HOME)/.local/share/rzn-python-tools
 INSTALL_BIN_DIR ?= $(HOME)/.local/bin
 WORKFLOWS_DIR ?= $(HOME)/.rzn/python-tools/workflows
 
-.PHONY: install build-install-artifact release-installers release-plugins release-artifacts release workflows-sync status
+.PHONY: install build-install-artifact release-installers release-plugins release-artifacts release workflows-sync status verify
 
 install:
 	artifact="$$(python3 scripts/build_local_release.py --variant $(INSTALL_VARIANT) --print-artifact-path)"; \
@@ -37,3 +37,6 @@ workflows-sync:
 
 status:
 	"$(INSTALL_BIN_DIR)/rzn-python-tools" status
+
+verify:
+	python3 scripts/mcp_smoke.py

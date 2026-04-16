@@ -5,8 +5,10 @@ Date: 2026-02-13
 This doc describes how “Python Tools” should ship as an installable RZN extension (plugin bundle) so:
 
 - `rznapp` (desktop host) can install/update it from the backend catalog.
-- Python execution can run in multiple modes (secure sandbox vs YOLO) without requiring desktop rebuilds.
+- Python execution can run in concrete policy lanes: worker-enforced workspace isolation for the general secure path, explicit `platform_sandboxed` enterprise runs when the host can provide the OS boundary, and app-managed YOLO envs, without requiring desktop rebuilds.
 - Third-party “code skills” ecosystems (ClawHub/OpenClaw) can be supported safely via developer-mode imports.
+
+Do not use this doc to claim cross-platform OS sandbox parity. The broadly available secure lane is worker-enforced workspace isolation; `enterprise` can require a stronger OS boundary and now fails closed if the host cannot provide it. macOS plugin bundles are still the strongest OS-hardened path.
 
 Related docs:
 
@@ -50,7 +52,7 @@ For launch: ship the runtime with the extension (reduces “works on my machine�
 
 ---
 
-## 2) Execution Modes (Secure vs YOLO)
+## 2) Execution Modes (Policy-enforced secure lanes vs YOLO)
 
 We treat execution modes as:
 
@@ -64,6 +66,11 @@ We treat execution modes as:
 - deny subprocess by default
 - deterministic set of allowed packages (or no package installs)
 
+In the current implementation:
+
+- `balanced`, `data_science`, and `document_processing` default to `workspace_isolated`
+- `enterprise` requires `platform_sandboxed` and fails closed when the host cannot provide it
+
 ### 2.2 YOLO mode (developer / power users)
 
 - relaxed restrictions
@@ -73,6 +80,7 @@ Important:
 
 - The same extension bundle should support both modes.
 - Mode selection should be per-run and/or per-profile, not “compile-time”.
+- Do not read `platform_sandboxed` as a blanket cross-platform promise. It is a stricter policy lane that depends on host support.
 
 ---
 
@@ -139,6 +147,10 @@ The required sequence is:
 If local publish fails, stop there and report the failure. If cloud publish fails after local
 succeeds, report the cloud failure explicitly.
 
+The local and cloud verification is not hand-wavy. The release script already calls
+`verify_public_release()`, which checks the catalog JSON, the catalog signature, the versioned
+plugin entry, and the artifact URL after publish.
+
 Backend publishes:
 
 - versioned catalog objects + pointer file (`current.json`)
@@ -185,3 +197,4 @@ Stories:
 - build scripts in this repo produce signed zip artifacts
 - CI upload + backend register
 - local smoke runbook (install from file, run health/echo, run preset scripts)
+- publish verification hook that checks catalog + artifact serving after release

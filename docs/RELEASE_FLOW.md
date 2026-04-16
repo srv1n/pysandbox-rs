@@ -19,7 +19,7 @@ flowchart LR
   D --> E["git tag -a vx.y.z"]
   E --> F["git push branch + tag"]
   F --> G["GitHub Actions release workflow"]
-  G --> H["Build system bundles: Linux, Windows, macOS Intel, macOS Apple Silicon"]
+  G --> H["Build install bundles: Linux, Windows, macOS Intel, macOS Apple Silicon"]
   G --> I["Build macOS plugin ZIPs"]
   G --> J["Generate release notes from git diff since previous tag"]
   H --> K["Create GitHub Release"]
@@ -35,6 +35,8 @@ flowchart LR
 | macOS plugin ZIPs | `macos_x86_64`, `macos_aarch64` | For `rznapp` install-from-file flows |
 | Install scripts | shell + PowerShell | Attached to the GitHub Release and kept in `scripts/` |
 | Release notes | GitHub Release body | Generated from the git diff since the previous tag |
+
+These are release artifacts, not proof of OS-level sandbox parity.
 
 ## Why It Works This Way
 
