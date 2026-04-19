@@ -1,7 +1,7 @@
 # Python Tools Demo Suite
 
-This file defines a recommended demo ladder for `rzn-python-sandbox` and the Python
-Tools extension. The goal is not to show random Python snippets; it is to show
+This file defines a recommended demo ladder for RZN Python Sandbox and the Python
+Tools extension. Use `Python Sandbox` as the short label in diagrams. The goal is not to show random Python snippets; it is to show
 why this sandbox is useful:
 
 - basic deterministic execution

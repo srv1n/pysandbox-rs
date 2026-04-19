@@ -1,6 +1,6 @@
 # Embedding Guide
 
-This guide explains how to embed rzn-python-sandbox in your Rust application as a library.
+This guide explains how to embed the RZN Python Sandbox capability in your Rust application as a library.
 
 ## Table of Contents
 1. [Library Setup](#library-setup)
@@ -14,7 +14,7 @@ This guide explains how to embed rzn-python-sandbox in your Rust application as 
 
 ### Adding as a Dependency
 
-There are several ways to include rzn-python-sandbox in your project:
+There are several ways to include the RZN Python Sandbox crate in your project:
 
 #### 1. Local Path
 ```toml

@@ -1,6 +1,12 @@
 # RZN Python Sandbox
 
-`rzn-python-sandbox` gives you an installable Python runtime for RZN-style tool workflows and a Rust library for embedding the same sandbox in your own app.
+RZN Python Sandbox packages a Python execution capability for RZN-style tool workflows, plus a Rust library you can embed in your own app. Keep `rzn-python-sandbox` for Git, Cargo, and packaging surfaces; use `RZN Python Sandbox` in prose and `Python Sandbox` in diagrams.
+
+| Surface | Canonical name |
+| --- | --- |
+| Repo slug | `rzn-python-sandbox` |
+| Display name | `RZN Python Sandbox` |
+| Short diagram label | `Python Sandbox` |
 
 The hardening story is blunt: `balanced`, `data_science`, and `document_processing` default to `workspace_isolated`; `enterprise` requires `platform_sandboxed` and now fails closed when that OS-level boundary is unavailable; `yolo` is the app-managed env lane. macOS plugin bundles are still the strongest OS-hardened packaging path today, and there is no cross-platform App Sandbox parity claim here.
 
@@ -23,7 +29,7 @@ If your product needs Python, the annoying part is rarely `python`. It is the re
 - returning JSON and files in a shape the host can actually use
 - making the install story sane
 
-This repo exists to handle that once instead of rebuilding it in every host app.
+This capability exists to handle that once instead of rebuilding it in every host app.
 
 Try it if you need Python for transforms, analysis, charting, or ML, but you do not want to hand your app a raw interpreter and hope for the best.
 
@@ -185,7 +191,7 @@ The DS quick starts prove the worker can return binary outputs cleanly.
 
 ## System Integrations
 
-| Integration point | What this repo gives you |
+| Integration point | What the capability gives you |
 | --- | --- |
 | RZN desktop / any MCP host | A worker process you can install, launch, and call as tools |
 | Local machine install | A CLI plus a wrapped worker binary that can run outside the host app |
@@ -213,7 +219,7 @@ let result = sandbox
 
 ## Diagram Briefs
 
-These are source briefs for the downstream design/render team. Keep the labels literal. The point is clarity, not decoration.
+These are source briefs for the downstream design/render team. Keep the labels literal. Use `Python Sandbox` for the capability node label, not the repo slug. The point is clarity, not decoration.
 
 ### Diagram 1: Product Surface
 

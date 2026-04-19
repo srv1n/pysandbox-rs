@@ -1,6 +1,6 @@
 # Plugin Bundles (Python Tools): Pack + Sign
 
-This repo can build a signed `python-tools` extension ZIP suitable for the RZN desktop host
+This packaging flow builds a signed `python-tools` extension ZIP suitable for the RZN desktop host
 (`rznapp`) **Install from file…** loop.
 
 If you want a machine-local install you can invoke from anywhere on your Mac, do not use the plugin

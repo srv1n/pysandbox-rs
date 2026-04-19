@@ -1,6 +1,14 @@
 # Rename Migration Notes
 
-`pysandbox-rs` is now `rzn-python-sandbox`. Treat it like infrastructure, not a standalone branded product.
+The repo slug moved from `pysandbox-rs` to `rzn-python-sandbox`. The human-facing name is `RZN Python Sandbox`, and the short diagram label is `Python Sandbox`. Treat it like infrastructure, not a standalone branded product.
+
+## Naming surfaces
+
+| Surface | Canonical name |
+| --- | --- |
+| Repo slug | `rzn-python-sandbox` |
+| Display name | `RZN Python Sandbox` |
+| Short diagram label | `Python Sandbox` |
 
 ## Canonical names
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Microsandbox provides the highest level of security for Python execution by running code in isolated micro-VMs. This guide explains how to set up and use microsandbox with rzn-python-sandbox.
+Microsandbox provides the highest level of security for Python execution by running code in isolated micro-VMs. This guide explains how to set up and use microsandbox with the RZN Python Sandbox capability.
 
 ## Security Levels
 
@@ -236,7 +236,7 @@ cargo uninstall microsandbox
 ## FAQ
 
 **Q: Is microsandbox required?**
-A: No, rzn-python-sandbox falls back to native Python with security restrictions.
+A: No, RZN Python Sandbox falls back to native Python with security restrictions.
 
 **Q: Can I use custom Python packages?**
 A: Currently limited to pre-installed packages in the image.

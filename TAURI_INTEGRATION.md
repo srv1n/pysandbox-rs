@@ -1,6 +1,6 @@
 # Tauri Integration Guide
 
-This guide explains how to embed rzn-python-sandbox in a Tauri application with dynamic module downloading and management.
+This guide explains how to embed the RZN Python Sandbox capability in a Tauri application with dynamic module downloading and management.
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -13,7 +13,7 @@ This guide explains how to embed rzn-python-sandbox in a Tauri application with 
 
 ## Overview
 
-When integrating rzn-python-sandbox into a Tauri application, you'll need to:
+When integrating the RZN Python Sandbox capability into a Tauri application, you'll need to:
 - Bundle Python runtime with your app
 - Dynamically download Python packages as needed
 - Expose sandbox functionality through Tauri commands
