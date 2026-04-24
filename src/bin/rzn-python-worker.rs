@@ -1,7 +1,7 @@
 use rzn_python_sandbox::{
-    ExecutionEnvironment, ExecutionMode, ExecutionOptions, NativePythonEngine, PolicyManager,
-    PythonEngine, PythonSandbox, ResourceLimits, SandboxConfig, SandboxPolicy,
-    SandboxedPythonEngine,
+    ExecutionEnvironment, ExecutionMode, ExecutionOptions, FlowFailureErrorCode,
+    FlowFailureReportDraft, FlowFailureStage, NativePythonEngine, PolicyManager, PythonEngine,
+    PythonSandbox, ResourceLimits, SandboxConfig, SandboxPolicy, SandboxedPythonEngine,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -1070,6 +1070,11 @@ async fn python_env_install_call(args: &Value) -> std::result::Result<Value, Val
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     if !output.status.success() {
+        let failure_report_draft = FlowFailureReportDraft::from_parts(
+            FlowFailureStage::InstallDeps,
+            FlowFailureErrorCode::DependencyInstallFailed,
+            None,
+        );
         return Ok(json!({
             "content": [{ "type": "text", "text": format!("pip install failed for env '{}'", alias) }],
             "structuredContent": {
@@ -1079,7 +1084,8 @@ async fn python_env_install_call(args: &Value) -> std::result::Result<Value, Val
                 "ok": false,
                 "command_args": args_for_result,
                 "stdout": stdout,
-                "stderr": stderr
+                "stderr": stderr,
+                "failure_report_draft": failure_report_draft
             },
             "isError": true
         }));
@@ -1337,15 +1343,18 @@ async fn python_sandbox_call(
                 "isError": false
             }))
         }
-        Err(e) => Ok(json!({
-            "content": [{ "type": "text", "text": format!("error: {}", e) }],
-            "structuredContent": {
-                "policy_id": policy_id,
-                "python": python_resolution,
-                "error": e.to_string()
-            },
-            "isError": true
-        })),
+        Err(e) => {
+            let failure_report_draft = FlowFailureReportDraft::from_sandbox_error(&e, None);
+            let stable_error = serde_json::to_value(failure_report_draft.error)
+                .unwrap_or_else(|_| Value::String("unknown_failure".to_string()));
+            Ok(json!({
+                "content": [{ "type": "text", "text": format!("error: {}", stable_error.as_str().unwrap_or("unknown_failure")) }],
+                "structuredContent": {
+                    "failure_report_draft": failure_report_draft
+                },
+                "isError": true
+            }))
+        }
     }
 }
 

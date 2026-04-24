@@ -9,6 +9,7 @@ const USAGE: &str = "\
 Usage:
   rzn-python-tools status [--json]
   rzn-python-tools paths [--json]
+  rzn-python-tools failure-report-draft --failed-stage STAGE --error ERROR [--note TEXT] [--json]
   rzn-python-tools workflows sync [--dest PATH] [--force]
   rzn-python-tools worker [-- <args passed to rzn-python-worker>]
 ";
@@ -75,6 +76,7 @@ fn run() -> anyhow::Result<()> {
     match cmd {
         "status" => cmd_status(&args[2..]),
         "paths" => cmd_paths(&args[2..]),
+        "failure-report-draft" => cmd_failure_report_draft(&args[2..]),
         "workflows" => cmd_workflows(&args[2..]),
         "worker" | "serve" => cmd_worker(&args[2..]),
         "-h" | "--help" | "" => {
@@ -82,6 +84,86 @@ fn run() -> anyhow::Result<()> {
             Ok(())
         }
         _ => Err(anyhow::anyhow!("unknown command: {}\n\n{}", cmd, USAGE)),
+    }
+}
+
+fn cmd_failure_report_draft(args: &[String]) -> anyhow::Result<()> {
+    let mut failed_stage = None;
+    let mut error = None;
+    let mut note = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--failed-stage" => {
+                let value = args
+                    .get(i + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --failed-stage"))?;
+                failed_stage = Some(parse_failure_stage(value)?);
+                i += 2;
+            }
+            "--error" => {
+                let value = args
+                    .get(i + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --error"))?;
+                error = Some(parse_failure_error(value)?);
+                i += 2;
+            }
+            "--note" => {
+                let value = args
+                    .get(i + 1)
+                    .ok_or_else(|| anyhow::anyhow!("missing value for --note"))?;
+                note = Some(value.to_string());
+                i += 2;
+            }
+            "--json" => {
+                i += 1;
+            }
+            other => return Err(anyhow::anyhow!("unknown failure-report-draft arg: {other}")),
+        }
+    }
+
+    let failed_stage = failed_stage.ok_or_else(|| anyhow::anyhow!("--failed-stage is required"))?;
+    let error = error.ok_or_else(|| anyhow::anyhow!("--error is required"))?;
+    let draft = rzn_python_sandbox::FlowFailureReportDraft::from_parts(
+        failed_stage,
+        error,
+        note.filter(|s| !s.trim().is_empty()),
+    );
+
+    print_json(&draft)
+}
+
+fn parse_failure_stage(value: &str) -> anyhow::Result<rzn_python_sandbox::FlowFailureStage> {
+    use rzn_python_sandbox::FlowFailureStage as Stage;
+    match value.trim() {
+        "prepare_env" => Ok(Stage::PrepareEnv),
+        "resolve_runtime" => Ok(Stage::ResolveRuntime),
+        "install_deps" => Ok(Stage::InstallDeps),
+        "stage_files" => Ok(Stage::StageFiles),
+        "execute" => Ok(Stage::Execute),
+        "enforce_limits" => Ok(Stage::EnforceLimits),
+        "collect_result" => Ok(Stage::CollectResult),
+        "cleanup" => Ok(Stage::Cleanup),
+        other => Err(anyhow::anyhow!("unknown failed_stage: {other}")),
+    }
+}
+
+fn parse_failure_error(value: &str) -> anyhow::Result<rzn_python_sandbox::FlowFailureErrorCode> {
+    use rzn_python_sandbox::FlowFailureErrorCode as Code;
+    match value.trim() {
+        "runtime_error" => Ok(Code::RuntimeError),
+        "timeout" => Ok(Code::Timeout),
+        "dependency_install_failed" => Ok(Code::DependencyInstallFailed),
+        "dependency_resolution_failed" => Ok(Code::DependencyResolutionFailed),
+        "memory_limit_exceeded" => Ok(Code::MemoryLimitExceeded),
+        "cpu_limit_exceeded" => Ok(Code::CpuLimitExceeded),
+        "disk_limit_exceeded" => Ok(Code::DiskLimitExceeded),
+        "permission_denied" => Ok(Code::PermissionDenied),
+        "runtime_missing" => Ok(Code::RuntimeMissing),
+        "result_collection_failed" => Ok(Code::ResultCollectionFailed),
+        "unknown_failure" => Ok(Code::UnknownFailure),
+        other => Err(anyhow::anyhow!("unknown error code: {other}")),
     }
 }
 
