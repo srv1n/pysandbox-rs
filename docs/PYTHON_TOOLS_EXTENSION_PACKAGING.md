@@ -185,7 +185,7 @@ Python Tools becomes the runtime boundary that makes this possible.
 
 ---
 
-## 7) Work Breakdown (for Beads)
+## 7) Work Breakdown
 
 Suggested epic:
 
